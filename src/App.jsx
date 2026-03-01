@@ -1,15 +1,22 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import * as XLSX from "xlsx";
+import {
+  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
+  Tooltip, ResponsiveContainer, Legend
+} from "recharts";
 import {
   LayoutDashboard, Users, Building2, TrendingUp, Upload, Plus, Search,
   ChevronDown, X, Phone, MapPin, Calendar, CheckCircle2, Send, Zap,
-  Bell, Pencil, Trash2, Tag, Loader2, MessageCircle, Clock, AlertTriangle,
-  CheckSquare, Square, FileText, Activity, StickyNote, ChevronRight,
-  PhoneCall, Coffee, FileCheck, Star
+  Bell, Pencil, Trash2, Tag, Loader2, MessageCircle, AlertTriangle,
+  CheckSquare, Square, StickyNote, Activity, PhoneCall, Coffee,
+  FileCheck, BarChart2, Download, FileSpreadsheet, Target, Clock,
+  Star, TrendingDown, Award
 } from "lucide-react";
 
 const PRIMARY = "#820ad1";
 const SECONDARY = "#F7B500";
+const DIAS_FRIO = 5;
 
 const ESTADOS = [
   { label: "Lead Nuevo", color: "#6366f1", bg: "#eef2ff", icon: Zap },
@@ -28,13 +35,26 @@ const TIPO_ACTIVIDAD = [
   { value: "nota", label: "Nota", icon: StickyNote, color: "#10b981" },
 ];
 
-const DIAS_FRIO = 5;
+// ─── Plantillas WhatsApp por estado ──────────────────────────────────────────
+const WA_TEMPLATES = {
+  "Lead Nuevo": (n) =>
+    `Hola ${n}, te saluda el equipo de *Domonow* 👋\n\nNos especializamos en soluciones de domótica e inteligencia para unidades residenciales en el Valle de Aburrá.\n\n¿Tienes unos minutos para que te contemos cómo podemos ayudarles?`,
+  "Contacto Inicial": (n) =>
+    `Hola ${n}, qué gusto saludarte nuevamente 😊\n\nQuería hacer seguimiento a nuestra conversación sobre los servicios de *Domonow*.\n\n¿Pudiste comentarlo? ¿Quedó alguna duda que pueda resolver?`,
+  "Cita Programada": (n) =>
+    `Hola ${n} ✅\n\nTe confirmo nuestra cita para presentarte los servicios de *Domonow*.\n\nPor favor confírmame si la fecha y hora siguen bien. ¡Nos vemos pronto!`,
+  "Cotización Enviada": (n) =>
+    `Hola ${n}, espero estés muy bien 🙌\n\nQuería saber si tuviste la oportunidad de revisar la cotización de *Domonow*.\n\n¿Tienes alguna pregunta o ajuste? Estoy a tu disposición.`,
+  "Cerrado / Ganado": (n) =>
+    `Hola ${n} 🎉\n\n¡Bienvenido a la familia *Domonow*!\n\nEn los próximos días nuestro equipo técnico se pondrá en contacto para coordinar la instalación.\n\n¡Gracias por confiar en nosotros!`,
+};
 
 function diasDesde(fecha) {
   if (!fecha) return 999;
   return Math.floor((new Date() - new Date(fecha)) / (1000 * 60 * 60 * 24));
 }
 
+// ─── Helpers UI ───────────────────────────────────────────────────────────────
 function StatusBadge({ estado }) {
   const s = ESTADOS.find(e => e.label === estado) || ESTADOS[0];
   const Icon = s.icon;
@@ -72,6 +92,42 @@ function StatusDropdown({ value, onChange }) {
   );
 }
 
+// ─── Modal WhatsApp ───────────────────────────────────────────────────────────
+function WhatsAppModal({ lead, onClose }) {
+  const template = WA_TEMPLATES[lead.estado] || WA_TEMPLATES["Lead Nuevo"];
+  const [msg, setMsg] = useState(template(lead.nombre));
+  const numero = lead.celular?.replace(/\s/g, "");
+  const url = `https://wa.me/57${numero}?text=${encodeURIComponent(msg)}`;
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)" }}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 480, margin: "0 16px", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.15)" }}>
+        <div style={{ background: "#25D366", padding: "18px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <MessageCircle size={20} color="#fff" />
+            <span style={{ color: "#fff", fontWeight: 800, fontSize: 15, fontFamily: "Montserrat, sans-serif" }}>WhatsApp a {lead.nombre}</span>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, padding: 5, cursor: "pointer", display: "flex" }}><X size={15} color="#fff" /></button>
+        </div>
+        <div style={{ padding: 22 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Plantilla para estado: <span style={{ color: "#25D366" }}>{lead.estado}</span>
+          </p>
+          <textarea value={msg} onChange={e => setMsg(e.target.value)}
+            style={{ width: "100%", height: 160, padding: "12px", borderRadius: 10, border: "1.5px solid #ede8f7", fontFamily: "Montserrat, sans-serif", fontSize: 13, outline: "none", resize: "none", lineHeight: 1.6, boxSizing: "border-box", color: "#333" }} />
+          <p style={{ fontSize: 11, color: "#bbb", marginTop: 6, marginBottom: 14 }}>Puedes editar el mensaje antes de enviarlo.</p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 700, color: "#888", cursor: "pointer" }}>Cancelar</button>
+            <a href={url} target="_blank" rel="noreferrer" onClick={onClose}
+              style={{ flex: 2, padding: "10px", borderRadius: 10, background: "#25D366", color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none" }}>
+              <MessageCircle size={15} /> Abrir WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal Crear/Editar Lead ──────────────────────────────────────────────────
 function LeadModal({ lead, onClose, onSave, saving }) {
   const [f, setF] = useState(lead || { nombre: "", tipo: "Unidad Residencial", lugar: "", celular: "", email: "", fuente: "Referido", estado: "Lead Nuevo", notas: "" });
@@ -93,7 +149,7 @@ function LeadModal({ lead, onClose, onSave, saving }) {
           <div><label style={lbl}>Fuente</label><select style={{ ...inp, background: "#fff" }} value={f.fuente} onChange={e => set("fuente", e.target.value)}>{FUENTES.map(s => <option key={s}>{s}</option>)}</select></div>
           <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Email</label><input style={inp} type="email" value={f.email || ""} onChange={e => set("email", e.target.value)} /></div>
           <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Estado</label><select style={{ ...inp, background: "#fff" }} value={f.estado} onChange={e => set("estado", e.target.value)}>{ESTADOS.map(e => <option key={e.label}>{e.label}</option>)}</select></div>
-          <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Notas iniciales</label><textarea style={{ ...inp, height: 70, resize: "none" }} value={f.notas || ""} onChange={e => set("notas", e.target.value)} /></div>
+          <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Notas</label><textarea style={{ ...inp, height: 70, resize: "none" }} value={f.notas || ""} onChange={e => set("notas", e.target.value)} /></div>
         </div>
         <div style={{ padding: "14px 22px", borderTop: "1px solid #f5f0fb", display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 700, color: "#888", cursor: "pointer" }}>Cancelar</button>
@@ -108,7 +164,7 @@ function LeadModal({ lead, onClose, onSave, saving }) {
 }
 
 // ─── Panel Detalle Lead ───────────────────────────────────────────────────────
-function LeadPanel({ lead, onClose, onUpdate }) {
+function LeadPanel({ lead, onClose, onUpdate, onWhatsApp }) {
   const [tab, setTab] = useState("historial");
   const [actividades, setActividades] = useState([]);
   const [tareas, setTareas] = useState([]);
@@ -119,7 +175,6 @@ function LeadPanel({ lead, onClose, onUpdate }) {
   const [savingNotas, setSavingNotas] = useState(false);
 
   useEffect(() => {
-    if (!lead) return;
     fetchActividades();
     fetchTareas();
   }, [lead.id]);
@@ -172,8 +227,7 @@ function LeadPanel({ lead, onClose, onUpdate }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 150, display: "flex", justifyContent: "flex-end" }}>
       <div onClick={onClose} style={{ flex: 1, background: "rgba(0,0,0,0.3)" }} />
-      <div style={{ width: 420, background: "#fff", height: "100%", display: "flex", flexDirection: "column", boxShadow: "-8px 0 40px rgba(130,10,209,0.12)", overflow: "hidden" }}>
-        {/* Header */}
+      <div style={{ width: 430, background: "#fff", height: "100%", display: "flex", flexDirection: "column", boxShadow: "-8px 0 40px rgba(130,10,209,0.12)", overflow: "hidden" }}>
         <div style={{ background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, padding: "18px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
@@ -182,7 +236,7 @@ function LeadPanel({ lead, onClose, onUpdate }) {
             </div>
             <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, padding: 5, cursor: "pointer", display: "flex" }}><X size={15} color="#fff" /></button>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
             <StatusBadge estado={lead.estado} />
             {dias > DIAS_FRIO && lead.estado !== "Cerrado / Ganado" && (
               <span style={{ background: "rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 4 }}>
@@ -190,13 +244,12 @@ function LeadPanel({ lead, onClose, onUpdate }) {
               </span>
             )}
           </div>
-          {/* Quick actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             {lead.celular && (
-              <a href={`https://wa.me/57${lead.celular.replace(/\s/g, "")}`} target="_blank" rel="noreferrer"
-                style={{ display: "flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
+              <button onClick={() => onWhatsApp(lead)}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "#25D366", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer" }}>
                 <MessageCircle size={13} /> WhatsApp
-              </a>
+              </button>
             )}
             {lead.celular && (
               <a href={`tel:${lead.celular}`}
@@ -207,7 +260,6 @@ function LeadPanel({ lead, onClose, onUpdate }) {
           </div>
         </div>
 
-        {/* Tabs */}
         <div style={{ display: "flex", borderBottom: "1px solid #f0ebf7", background: "#faf5ff" }}>
           {[
             { id: "historial", icon: Activity, label: "Historial" },
@@ -220,10 +272,7 @@ function LeadPanel({ lead, onClose, onUpdate }) {
           ))}
         </div>
 
-        {/* Tab Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-
-          {/* HISTORIAL */}
           {tab === "historial" && (
             <div>
               <div style={{ background: "#faf5ff", borderRadius: 12, padding: 14, marginBottom: 16 }}>
@@ -236,7 +285,8 @@ function LeadPanel({ lead, onClose, onUpdate }) {
                     </button>
                   ))}
                 </div>
-                <textarea value={newAct.descripcion} onChange={e => setNewAct(p => ({ ...p, descripcion: e.target.value }))} placeholder={`¿Qué pasó en esta ${tipoAct?.label.toLowerCase()}?`}
+                <textarea value={newAct.descripcion} onChange={e => setNewAct(p => ({ ...p, descripcion: e.target.value }))}
+                  placeholder={`¿Qué pasó en esta ${tipoAct?.label.toLowerCase()}?`}
                   style={{ ...inp, height: 64, resize: "none", marginBottom: 8 }} />
                 <button onClick={addActividad} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                   Guardar actividad
@@ -244,7 +294,7 @@ function LeadPanel({ lead, onClose, onUpdate }) {
               </div>
               {loadingAct ? <div style={{ textAlign: "center", padding: 20 }}><Loader2 size={20} color={PRIMARY} style={{ animation: "spin 1s linear infinite" }} /></div> : (
                 <div>
-                  {actividades.length === 0 && <p style={{ textAlign: "center", color: "#ddd", fontSize: 12, padding: 20 }}>Sin actividad registrada aún</p>}
+                  {actividades.length === 0 && <p style={{ textAlign: "center", color: "#ddd", fontSize: 12, padding: 20 }}>Sin actividad registrada</p>}
                   {actividades.map(a => {
                     const t = TIPO_ACTIVIDAD.find(t => t.value === a.tipo) || TIPO_ACTIVIDAD[3];
                     return (
@@ -264,17 +314,14 @@ function LeadPanel({ lead, onClose, onUpdate }) {
             </div>
           )}
 
-          {/* TAREAS */}
           {tab === "tareas" && (
             <div>
               <div style={{ background: "#faf5ff", borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 <p style={{ fontSize: 11, fontWeight: 700, color: "#aaa", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Nueva tarea</p>
                 <input value={newTarea.descripcion} onChange={e => setNewTarea(p => ({ ...p, descripcion: e.target.value }))} placeholder="Ej: Llamar para confirmar cita" style={{ ...inp, marginBottom: 8 }} />
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8 }}>
                   <input type="date" value={newTarea.fecha} onChange={e => setNewTarea(p => ({ ...p, fecha: e.target.value }))} style={{ ...inp, flex: 1 }} />
-                  <button onClick={addTarea} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>
-                    + Agregar
-                  </button>
+                  <button onClick={addTarea} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>+ Agregar</button>
                 </div>
               </div>
               {tareas.length === 0 && <p style={{ textAlign: "center", color: "#ddd", fontSize: 12, padding: 20 }}>Sin tareas programadas</p>}
@@ -282,12 +329,10 @@ function LeadPanel({ lead, onClose, onUpdate }) {
                 const vencida = t.fecha && new Date(t.fecha) < new Date() && !t.completada;
                 return (
                   <div key={t.id} onClick={() => toggleTarea(t)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 10, marginBottom: 8, border: `1.5px solid ${vencida ? "#fee2e2" : "#f0ebf7"}`, background: t.completada ? "#f9fafb" : vencida ? "#fff5f5" : "#fff", cursor: "pointer" }}>
-                    {t.completada ? <CheckSquare size={18} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} /> : <Square size={18} color={vencida ? "#ef4444" : "#ccc"} style={{ flexShrink: 0, marginTop: 1 }} />}
+                    {t.completada ? <CheckSquare size={18} color="#10b981" style={{ flexShrink: 0 }} /> : <Square size={18} color={vencida ? "#ef4444" : "#ccc"} style={{ flexShrink: 0 }} />}
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: t.completada ? "#bbb" : "#333", textDecoration: t.completada ? "line-through" : "none" }}>{t.descripcion}</div>
-                      {t.fecha && <div style={{ fontSize: 10, marginTop: 3, color: vencida ? "#ef4444" : "#bbb", fontWeight: 600 }}>
-                        {vencida ? "⚠ Vencida · " : ""}{new Date(t.fecha + "T12:00:00").toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" })}
-                      </div>}
+                      {t.fecha && <div style={{ fontSize: 10, marginTop: 3, color: vencida ? "#ef4444" : "#bbb", fontWeight: 600 }}>{vencida ? "⚠ Vencida · " : ""}{new Date(t.fecha + "T12:00:00").toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" })}</div>}
                     </div>
                   </div>
                 );
@@ -295,14 +340,13 @@ function LeadPanel({ lead, onClose, onUpdate }) {
             </div>
           )}
 
-          {/* NOTAS */}
           {tab === "notas" && (
             <div>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#aaa", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Notas internas</p>
-              <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Escribe aquí cualquier información relevante sobre este lead..." style={{ ...inp, height: 220, resize: "none", marginBottom: 10, lineHeight: 1.6 }} />
+              <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Escribe información relevante sobre este lead..."
+                style={{ ...inp, height: 220, resize: "none", marginBottom: 10, lineHeight: 1.6 }} />
               <button onClick={saveNotas} disabled={savingNotas} style={{ width: "100%", padding: "9px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 12, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {savingNotas ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : null}
-                Guardar notas
+                {savingNotas ? <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> : null} Guardar notas
               </button>
             </div>
           )}
@@ -313,7 +357,7 @@ function LeadPanel({ lead, onClose, onUpdate }) {
 }
 
 // ─── Vista Tareas Global ──────────────────────────────────────────────────────
-function TareasView({ leads }) {
+function TareasView() {
   const [tareas, setTareas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("pendientes");
@@ -341,24 +385,30 @@ function TareasView({ leads }) {
     return true;
   });
 
+  const badges = [
+    { id: "hoy", label: `Hoy (${tareas.filter(t => t.fecha === hoy && !t.completada).length})` },
+    { id: "pendientes", label: `Pendientes (${tareas.filter(t => !t.completada).length})` },
+    { id: "vencidas", label: `Vencidas (${tareas.filter(t => t.fecha && t.fecha < hoy && !t.completada).length})`, alert: true },
+    { id: "completadas", label: "Completadas" },
+  ];
+
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {[
-          { id: "hoy", label: `Hoy (${tareas.filter(t => t.fecha === hoy && !t.completada).length})` },
-          { id: "pendientes", label: `Pendientes (${tareas.filter(t => !t.completada).length})` },
-          { id: "vencidas", label: `Vencidas (${tareas.filter(t => t.fecha && t.fecha < hoy && !t.completada).length})`, color: "#ef4444" },
-          { id: "completadas", label: "Completadas" },
-        ].map(f => (
-          <button key={f.id} onClick={() => setFiltro(f.id)} style={{ padding: "8px 14px", borderRadius: 10, border: `1.5px solid ${filtro === f.id ? PRIMARY : "#ede8f7"}`, background: filtro === f.id ? "#f5edfd" : "#fff", color: filtro === f.id ? PRIMARY : f.color || "#888", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {badges.map(f => (
+          <button key={f.id} onClick={() => setFiltro(f.id)} style={{ padding: "8px 14px", borderRadius: 10, border: `1.5px solid ${filtro === f.id ? (f.alert ? "#ef4444" : PRIMARY) : "#ede8f7"}`, background: filtro === f.id ? (f.alert ? "#fef2f2" : "#f5edfd") : "#fff", color: filtro === f.id ? (f.alert ? "#ef4444" : PRIMARY) : "#888", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             {f.label}
           </button>
         ))}
       </div>
-
       {loading ? <div style={{ textAlign: "center", padding: 40 }}><Loader2 size={24} color={PRIMARY} style={{ animation: "spin 1s linear infinite" }} /></div> : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filtradas.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#ddd" }}><CheckSquare size={36} style={{ margin: "0 auto 10px", opacity: 0.3 }} /><p style={{ fontWeight: 700, fontSize: 13 }}>Sin tareas en esta categoría</p></div>}
+          {filtradas.length === 0 && (
+            <div style={{ textAlign: "center", padding: 48, color: "#ddd" }}>
+              <CheckSquare size={36} style={{ margin: "0 auto 10px", opacity: 0.3 }} />
+              <p style={{ fontWeight: 700, fontSize: 13 }}>Sin tareas en esta categoría</p>
+            </div>
+          )}
           {filtradas.map(t => {
             const vencida = t.fecha && t.fecha < hoy && !t.completada;
             const esHoy = t.fecha === hoy;
@@ -389,6 +439,123 @@ function TareasView({ leads }) {
   );
 }
 
+// ─── Vista Reportes ───────────────────────────────────────────────────────────
+function ReportesView({ leads }) {
+  const COLORS = ["#820ad1", "#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ec4899"];
+
+  const porEstado = ESTADOS.map(e => ({
+    name: e.label.replace("Cotización Enviada", "Cotización").replace("Contacto Inicial", "Contacto").replace("Cerrado / Ganado", "Ganado"),
+    value: leads.filter(l => l.estado === e.label).length,
+    color: e.color,
+  }));
+
+  const porFuente = FUENTES.map((f, i) => ({
+    name: f,
+    leads: leads.filter(l => l.fuente === f).length,
+    fill: COLORS[i % COLORS.length],
+  })).filter(f => f.leads > 0).sort((a, b) => b.leads - a.leads);
+
+  const porMes = useMemo(() => {
+    const meses = {};
+    leads.forEach(l => {
+      if (!l.created_at) return;
+      const key = new Date(l.created_at).toLocaleDateString("es-CO", { month: "short", year: "2-digit" });
+      meses[key] = (meses[key] || 0) + 1;
+    });
+    return Object.entries(meses).slice(-6).map(([mes, total]) => ({ mes, total }));
+  }, [leads]);
+
+  const total = leads.length;
+  const ganados = leads.filter(l => l.estado === "Cerrado / Ganado").length;
+  const conversion = total > 0 ? ((ganados / total) * 100).toFixed(1) : 0;
+  const fuenteTop = porFuente[0]?.name || "—";
+  const esteMes = leads.filter(l => {
+    if (!l.created_at) return false;
+    const d = new Date(l.created_at);
+    const hoy = new Date();
+    return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear();
+  }).length;
+
+  return (
+    <div>
+      {/* KPIs de métricas */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 22 }}>
+        {[
+          { label: "Tasa de Conversión", val: `${conversion}%`, icon: Target, color: "#10b981", bg: "#ecfdf5", sub: "leads cerrados" },
+          { label: "Leads este Mes", val: esteMes, icon: TrendingUp, color: PRIMARY, bg: "#f5edfd", sub: "nuevos ingresos" },
+          { label: "Fuente #1", val: fuenteTop, icon: Star, color: "#f59e0b", bg: "#fffbeb", sub: "más efectiva" },
+          { label: "Total Activos", val: leads.filter(l => l.estado !== "Cerrado / Ganado").length, icon: Activity, color: "#6366f1", bg: "#eef2ff", sub: "en proceso" },
+        ].map(({ label, val, icon: Icon, color, bg, sub }) => (
+          <div key={label} style={{ background: "#fff", borderRadius: 16, padding: 18, border: "1px solid #f0ebf7" }}>
+            <div style={{ background: bg, borderRadius: 10, padding: 9, display: "inline-flex", marginBottom: 12 }}><Icon size={17} color={color} /></div>
+            <div style={{ fontSize: typeof val === "string" && val.length > 5 ? 16 : 26, fontWeight: 800, color: "#1A1A1A", lineHeight: 1, marginBottom: 3 }}>{val}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#333", marginBottom: 2 }}>{label}</div>
+            <div style={{ fontSize: 10, color: "#bbb" }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        {/* Leads por mes */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
+          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 18 }}>Leads por Mes</h3>
+          {porMes.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={porMes} barSize={32}>
+                <XAxis dataKey="mes" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ fontFamily: "Montserrat", fontSize: 12, borderRadius: 10, border: "1px solid #f0ebf7" }} />
+                <Bar dataKey="total" fill={PRIMARY} radius={[6, 6, 0, 0]} name="Leads" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos aún</p>}
+        </div>
+
+        {/* Leads por fuente */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
+          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 18 }}>Leads por Fuente</h3>
+          {porFuente.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={porFuente} layout="vertical" barSize={18}>
+                <XAxis type="number" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#555" }} axisLine={false} tickLine={false} width={90} />
+                <Tooltip contentStyle={{ fontFamily: "Montserrat", fontSize: 12, borderRadius: 10, border: "1px solid #f0ebf7" }} />
+                <Bar dataKey="leads" radius={[0, 6, 6, 0]} name="Leads">
+                  {porFuente.map((entry, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos aún</p>}
+        </div>
+      </div>
+
+      {/* Embudo de conversión */}
+      <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
+        <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 20 }}>Embudo de Conversión</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {ESTADOS.map(({ label, color, bg, icon: Icon }, i) => {
+            const count = leads.filter(l => l.estado === label).length;
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const width = 100 - (i * 10);
+            return (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ background: bg, padding: "5px 7px", borderRadius: 8, flexShrink: 0 }}><Icon size={13} color={color} /></div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#555", width: 160, flexShrink: 0 }}>{label}</span>
+                <div style={{ flex: 1, height: 28, background: "#f9fafb", borderRadius: 8, overflow: "hidden", position: "relative" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 8, opacity: 0.85, minWidth: count > 0 ? 40 : 0, display: "flex", alignItems: "center", paddingLeft: 10, transition: "width 0.6s ease" }}>
+                    {count > 0 && <span style={{ color: "#fff", fontSize: 11, fontWeight: 800 }}>{count}</span>}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 800, color, width: 38, textAlign: "right", flexShrink: 0 }}>{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── App Principal ────────────────────────────────────────────────────────────
 export default function App() {
   const [leads, setLeads] = useState([]);
@@ -400,6 +567,7 @@ export default function App() {
   const [filterEstado, setFilterEstado] = useState("Todos");
   const [modal, setModal] = useState(null);
   const [panel, setPanel] = useState(null);
+  const [waModal, setWaModal] = useState(null);
   const fileRef = useRef();
 
   useEffect(() => { fetchLeads(); }, []);
@@ -435,29 +603,54 @@ export default function App() {
     await supabase.from("actividades").insert([{ lead_id: id, tipo: "nota", descripcion: `Estado cambiado a: ${estado}` }]);
   }
 
+  // ── Exportar Excel ──
+  function exportarExcel() {
+    const datos = leads.map(l => ({
+      "Nombre / Unidad": l.nombre,
+      "Tipo": l.tipo,
+      "Lugar": l.lugar,
+      "Celular": l.celular,
+      "Email": l.email,
+      "Fuente": l.fuente,
+      "Estado": l.estado,
+      "Notas": l.notas || "",
+      "Fecha Creación": l.created_at ? new Date(l.created_at).toLocaleDateString("es-CO") : "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(datos);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leads Domonow");
+    ws["!cols"] = [{ wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 28 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }];
+    XLSX.writeFile(wb, `domonow-leads-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async ev => {
-      const lines = ev.target.result.trim().split("\n");
-      const headers = lines[0].split(",").map(h => h.trim().replace(/"/g, ""));
-      const newLeads = lines.slice(1).map(line => {
-        const cols = line.split(",").map(c => c.trim().replace(/"/g, ""));
-        const row = {};
-        headers.forEach((h, i) => row[h] = cols[i] || "");
-        return { nombre: row["Nombre Unidad"] || row["nombre"] || "", tipo: row["Tipo"] || "Unidad Residencial", lugar: row["Lugar"] || "", celular: row["Celular"] || "", email: row["Email"] || "", fuente: row["Fuente"] || "Otro", estado: row["Estado"] || "Lead Nuevo" };
-      }).filter(l => l.nombre);
-      const { data } = await supabase.from("leads").insert(newLeads).select();
-      if (data) setLeads(p => [...data, ...p]);
+      const wb = XLSX.read(ev.target.result, { type: "binary" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws);
+      const newLeads = data.map(row => ({
+        nombre: row["Nombre Unidad"] || row["Nombre / Unidad"] || row["nombre"] || "",
+        tipo: row["Tipo"] || "Unidad Residencial",
+        lugar: row["Lugar"] || "",
+        celular: row["Celular"] || "",
+        email: row["Email"] || "",
+        fuente: row["Fuente"] || "Otro",
+        estado: row["Estado"] || "Lead Nuevo",
+        notas: row["Notas"] || "",
+      })).filter(l => l.nombre);
+      const { data: inserted } = await supabase.from("leads").insert(newLeads).select();
+      if (inserted) setLeads(p => [...inserted, ...p]);
     };
-    reader.readAsText(file);
+    reader.readAsBinaryString(file);
     e.target.value = "";
   };
 
   const filtered = useMemo(() => leads.filter(l => {
     const q = search.toLowerCase();
-    return (!q || l.nombre?.toLowerCase().includes(q) || (l.lugar || "").toLowerCase().includes(q))
+    return (!q || l.nombre?.toLowerCase().includes(q) || (l.lugar || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q))
       && (filterTipo === "Todos" || l.tipo === filterTipo)
       && (filterEstado === "Todos" || l.estado === filterEstado);
   }), [leads, search, filterTipo, filterEstado]);
@@ -476,6 +669,7 @@ export default function App() {
     { id: "leads", icon: Users, label: "Leads" },
     { id: "tareas", icon: CheckSquare, label: "Tareas" },
     { id: "pipeline", icon: TrendingUp, label: "Pipeline" },
+    { id: "reportes", icon: BarChart2, label: "Reportes" },
   ];
 
   return (
@@ -520,14 +714,19 @@ export default function App() {
         <header style={{ background: "#fff", borderBottom: "1px solid #ede8f7", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
             <h1 style={{ fontSize: 16, fontWeight: 800, color: "#1A1A1A", margin: 0 }}>
-              {nav === "dashboard" ? "Dashboard" : nav === "leads" ? "Gestión de Leads" : nav === "tareas" ? "Tareas y Seguimientos" : "Pipeline de Ventas"}
+              {{ dashboard: "Dashboard", leads: "Gestión de Leads", tareas: "Tareas y Seguimientos", pipeline: "Pipeline de Ventas", reportes: "Reportes y Métricas" }[nav]}
             </h1>
             <p style={{ fontSize: 10, color: "#bbb", fontWeight: 600, margin: 0 }}>Valle de Aburrá · {new Date().toLocaleDateString("es-CO", { dateStyle: "long" })}</p>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {leadsFrios.length > 0 && (
               <button onClick={() => setNav("leads")} style={{ display: "flex", alignItems: "center", gap: 5, background: "#fef2f2", border: "1.5px solid #fecaca", color: "#ef4444", padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                <AlertTriangle size={12} /> {leadsFrios.length} leads fríos
+                <AlertTriangle size={12} /> {leadsFrios.length} fríos
+              </button>
+            )}
+            {nav === "leads" && (
+              <button onClick={exportarExcel} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", border: "1.5px solid #bbf7d0", color: "#16a34a", padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                <FileSpreadsheet size={13} /> Exportar Excel
               </button>
             )}
             <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(130,10,209,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -562,7 +761,6 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Alerta leads fríos */}
                 {leadsFrios.length > 0 && (
                   <div style={{ background: "#fff5f5", borderRadius: 14, padding: 16, border: "1.5px solid #fecaca", marginBottom: 18 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -571,7 +769,7 @@ export default function App() {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {leadsFrios.slice(0, 4).map(l => (
-                        <div key={l.id} onClick={() => { setPanel(l); }} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", padding: "8px 12px", borderRadius: 10, cursor: "pointer", border: "1px solid #fee2e2" }}>
+                        <div key={l.id} onClick={() => setPanel(l)} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", padding: "8px 12px", borderRadius: 10, cursor: "pointer", border: "1px solid #fee2e2" }}>
                           <div style={{ flex: 1 }}>
                             <span style={{ fontSize: 12, fontWeight: 700, color: "#333" }}>{l.nombre}</span>
                             <span style={{ fontSize: 11, color: "#bbb", marginLeft: 8 }}>{l.lugar}</span>
@@ -602,22 +800,22 @@ export default function App() {
                       );
                     })}
                   </div>
-
                   <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
-                    <h3 style={{ fontWeight: 800, fontSize: 14, marginBottom: 16, color: "#1A1A1A" }}>Por Fuente</h3>
-                    {FUENTES.filter(f => leads.some(l => l.fuente === f)).map(fuente => {
-                      const count = leads.filter(l => l.fuente === fuente).length;
-                      const pct = leads.length ? Math.round((count / leads.length) * 100) : 0;
-                      return (
-                        <div key={fuente} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: "#555", width: 130, flexShrink: 0 }}>{fuente}</span>
-                          <div style={{ flex: 1, height: 6, background: "#f3f4f6", borderRadius: 10, overflow: "hidden" }}>
-                            <div style={{ width: `${pct}%`, height: "100%", background: PRIMARY, borderRadius: 10, opacity: 0.6 + (pct / 200) }} />
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: PRIMARY, width: 28, textAlign: "right" }}>{count}</span>
+                    <h3 style={{ fontWeight: 800, fontSize: 14, marginBottom: 16, color: "#1A1A1A" }}>Recientes</h3>
+                    {leads.slice(0, 5).map(l => (
+                      <div key={l.id} onClick={() => setPanel(l)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderRadius: 10, marginBottom: 3, cursor: "pointer" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#faf5ff"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <div style={{ width: 30, height: 30, borderRadius: 9, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {l.tipo === "Administrador" ? <Users size={13} color="#f59e0b" /> : <Building2 size={13} color={PRIMARY} />}
                         </div>
-                      );
-                    })}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>{l.nombre}</div>
+                          <div style={{ fontSize: 10, color: "#bbb" }}>{l.lugar} · {l.fuente}</div>
+                        </div>
+                        <StatusBadge estado={l.estado} />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -629,7 +827,7 @@ export default function App() {
                 <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
                   <div style={{ position: "relative", flex: 1, minWidth: 160 }}>
                     <Search size={13} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#ccc" }} />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." style={{ width: "100%", paddingLeft: 32, paddingRight: 10, paddingTop: 9, paddingBottom: 9, borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 12, outline: "none" }} />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, lugar o email..." style={{ width: "100%", paddingLeft: 32, paddingRight: 10, paddingTop: 9, paddingBottom: 9, borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 12, outline: "none" }} />
                   </div>
                   <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} style={{ padding: "9px 10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer" }}>
                     <option>Todos</option>{TIPOS.map(t => <option key={t}>{t}</option>)}
@@ -638,14 +836,14 @@ export default function App() {
                     <option>Todos</option>{ESTADOS.map(e => <option key={e.label}>{e.label}</option>)}
                   </select>
                   <button onClick={() => fileRef.current.click()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 10, border: `1.5px solid ${SECONDARY}`, background: "#fffdf0", color: "#b88000", cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700 }}>
-                    <Upload size={13} /> CSV
+                    <Upload size={13} /> Importar
                   </button>
-                  <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFile} />
+                  <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={handleFile} />
                   <button onClick={() => setModal("new")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 800 }}>
                     <Plus size={13} /> Nuevo Lead
                   </button>
                 </div>
-                <p style={{ fontSize: 11, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>{filtered.length} de {leads.length} leads · haz clic en cualquier fila para ver el detalle</p>
+                <p style={{ fontSize: 11, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>{filtered.length} de {leads.length} leads · clic en una fila para ver detalle</p>
                 <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0ebf7", overflow: "hidden" }}>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
@@ -678,9 +876,12 @@ export default function App() {
                               <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", color: l.tipo === "Administrador" ? "#f59e0b" : PRIMARY }}>{l.tipo === "Unidad Residencial" ? "Residencial" : "Admin"}</span></td>
                               <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 3 }}><MapPin size={10} color="#ccc" />{l.lugar}</span></td>
                               <td style={{ padding: "10px 14px" }}>
-                                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
                                   <span style={{ fontSize: 11, color: "#999" }}>{l.celular}</span>
-                                  {l.celular && <a href={`https://wa.me/57${l.celular.replace(/\s/g, "")}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ background: "#25D36615", color: "#25D366", padding: "2px 6px", borderRadius: 6, fontSize: 10, fontWeight: 700, textDecoration: "none" }}>WA</a>}
+                                  {l.celular && (
+                                    <button onClick={e => { e.stopPropagation(); setWaModal(l); }}
+                                      style={{ background: "#25D36615", color: "#25D366", padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer" }}>WA</button>
+                                  )}
                                 </div>
                               </td>
                               <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span></td>
@@ -688,11 +889,9 @@ export default function App() {
                               <td style={{ padding: "10px 14px" }}>
                                 {frio ? (
                                   <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#fee2e2", padding: "2px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3, width: "fit-content" }}>
-                                    <AlertTriangle size={9} />{dias}d frío
+                                    <AlertTriangle size={9} />{dias}d
                                   </span>
-                                ) : (
-                                  <span style={{ fontSize: 10, color: "#bbb" }}>{dias === 0 ? "hoy" : `${dias}d`}</span>
-                                )}
+                                ) : <span style={{ fontSize: 10, color: "#bbb" }}>{dias === 0 ? "hoy" : `${dias}d`}</span>}
                               </td>
                               <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
                                 <div style={{ display: "flex", gap: 4 }}>
@@ -711,13 +910,14 @@ export default function App() {
               </div>
             )}
 
-            {/* TAREAS */}
-            {nav === "tareas" && <TareasView leads={leads} />}
+            {nav === "tareas" && <TareasView />}
+
+            {nav === "reportes" && <ReportesView leads={leads} />}
 
             {/* PIPELINE */}
             {nav === "pipeline" && (
               <div>
-                <p style={{ fontSize: 11, color: "#bbb", marginBottom: 16, fontWeight: 600 }}>Vista Kanban · {leads.length} leads activos</p>
+                <p style={{ fontSize: 11, color: "#bbb", marginBottom: 16, fontWeight: 600 }}>Vista Kanban · {leads.length} leads · clic en una tarjeta para ver detalle</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
                   {ESTADOS.map(({ label, color, bg, icon: Icon }) => {
                     const col = leads.filter(l => l.estado === label);
@@ -734,7 +934,7 @@ export default function App() {
                               <div key={l.id} onClick={() => setPanel(l)} style={{ background: frio ? "#fff8f8" : "#faf7fe", borderRadius: 10, padding: "10px 12px", border: `1px solid ${frio ? "#fecaca" : "#f0e8fb"}`, cursor: "pointer" }}>
                                 <div style={{ fontWeight: 700, fontSize: 11, color: "#1A1A1A", marginBottom: 4 }}>{l.nombre}</div>
                                 <div style={{ fontSize: 10, color: "#bbb", display: "flex", alignItems: "center", gap: 3 }}><MapPin size={9} />{l.lugar}</div>
-                                {frio && <div style={{ fontSize: 9, color: "#ef4444", fontWeight: 700, marginTop: 4 }}>⚠ Sin contacto {diasDesde(l.ultimo_contacto || l.created_at)}d</div>}
+                                {frio && <div style={{ fontSize: 9, color: "#ef4444", fontWeight: 700, marginTop: 4 }}>⚠ {diasDesde(l.ultimo_contacto || l.created_at)}d sin contacto</div>}
                               </div>
                             );
                           })}
@@ -751,7 +951,8 @@ export default function App() {
       </div>
 
       {modal && <LeadModal lead={modal === "new" ? null : modal} onClose={() => setModal(null)} onSave={save} saving={saving} />}
-      {panel && <LeadPanel lead={panel} onClose={() => setPanel(null)} onUpdate={fetchLeads} />}
+      {panel && <LeadPanel lead={panel} onClose={() => setPanel(null)} onUpdate={fetchLeads} onWhatsApp={setWaModal} />}
+      {waModal && <WhatsAppModal lead={waModal} onClose={() => setWaModal(null)} />}
     </div>
   );
 }
