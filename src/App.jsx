@@ -28,7 +28,7 @@ const ESTADOS = [
 ];
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
-const FUENTES = ["Landing","Referido", "Instagram", "WhatsApp", "Puerta a Puerta", "Llamada en Frío", "Salida de Campo", "Otro"];
+const FUENTES = ["Landing","Referido", "Instagram", "WhatsApp", "Puerta a Puerta", "Llamada en Frío", "Salida de Campo","Apollo","Linkedln", "Otro"];
 const TIPO_ACTIVIDAD = [
   { value: "llamada", label: "Llamada", icon: PhoneCall, color: "#0ea5e9" },
   { value: "reunion", label: "Reunión", icon: Coffee, color: "#f59e0b" },
@@ -651,6 +651,9 @@ export default function App() {
   const [filterTipo, setFilterTipo] = useState("Todos");
   const [filterEstado, setFilterEstado] = useState("Todos");
   const [filterFuente, setFilterFuente] = useState("Todos");
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [bulkEstado, setBulkEstado] = useState("");
+  const [ultimaImportacion, setUltimaImportacion] = useState([]);
   const [modal, setModal] = useState(null);
   const [panel, setPanel] = useState(null);
   const [waModal, setWaModal] = useState(null);
@@ -705,6 +708,47 @@ export default function App() {
     await supabase.from("leads").delete().eq("id", id);
     setLeads(p => p.filter(l => l.id !== id));
   }
+  // Deshacer última importación
+async function deshacerImportacion() {
+  if (ultimaImportacion.length === 0) {
+    alert("No hay importación reciente para deshacer.");
+    return;
+  }
+  const confirmar = window.confirm(`¿Eliminar los últimos ${ultimaImportacion.length} contactos importados?`);
+  if (!confirmar) return;
+  await supabase.from("leads").delete().in("id", ultimaImportacion);
+  setLeads(p => p.filter(l => !ultimaImportacion.includes(l.id)));
+  setUltimaImportacion([]);
+  alert("✅ Importación deshecha correctamente.");
+}
+
+// Eliminar seleccionados
+async function eliminarSeleccionados() {
+  if (seleccionados.length === 0) return;
+  const confirmar = window.confirm(`¿Eliminar ${seleccionados.length} contactos seleccionados?`);
+  if (!confirmar) return;
+  await supabase.from("leads").delete().in("id", seleccionados);
+  setLeads(p => p.filter(l => !seleccionados.includes(l.id)));
+  setSeleccionados([]);
+}
+
+// Cambiar estado en masa
+async function cambiarEstadoMasivo() {
+  if (seleccionados.length === 0 || !bulkEstado) return;
+  await supabase.from("leads").update({ estado: bulkEstado }).in("id", seleccionados);
+  setLeads(p => p.map(l => seleccionados.includes(l.id) ? { ...l, estado: bulkEstado } : l));
+  setSeleccionados([]);
+  setBulkEstado("");
+}
+
+// Seleccionar / deseleccionar todos
+function toggleSelectAll() {
+  if (seleccionados.length === filtered.length) {
+    setSeleccionados([]);
+  } else {
+    setSeleccionados(filtered.map(l => l.id));
+  }
+}
 
   async function updateEstado(id, estado) {
     await supabase.from("leads").update({ estado }).eq("id", id);
@@ -777,7 +821,8 @@ export default function App() {
       }
       if (inserted) {
         setLeads(p => [...inserted, ...p]);
-        alert(`✅ ${inserted.length} contactos importados correctamente`);
+        setUltimaImportacion(inserted.map(l => l.id));
+        alert(`✅ ${inserted.length} contactos importados. Puedes deshacer esta importación con el botón "Deshacer importación".`);
       }
     };
     reader.readAsBinaryString(file);
@@ -984,68 +1029,149 @@ export default function App() {
                     <Plus size={13} /> Nuevo Lead
                   </button>
                 </div>
-                <p style={{ fontSize: 11, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>{filtered.length} de {leads.length} leads · clic en una fila para ver detalle</p>
+                {/* Barra de acciones masivas */}
+                {seleccionados.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 12, background: "#f5edfd", border: `1.5px solid ${PRIMARY}30`, marginBottom: 12, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: PRIMARY }}>{seleccionados.length} seleccionados</span>
+                    <div style={{ display: "flex", gap: 8, flex: 1, flexWrap: "wrap" }}>
+                      <select value={bulkEstado} onChange={e => setBulkEstado(e.target.value)}
+                        style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer" }}>
+                        <option value="">Cambiar estado a...</option>
+                        {ESTADOS.map(e => <option key={e.label} value={e.label}>{e.label}</option>)}
+                      </select>
+                      <button onClick={cambiarEstadoMasivo} disabled={!bulkEstado}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: bulkEstado ? PRIMARY : "#e5e7eb", color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: bulkEstado ? "pointer" : "not-allowed" }}>
+                        Aplicar
+                      </button>
+                      <button onClick={eliminarSeleccionados}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#fef2f2", color: "#ef4444", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1.5px solid #fecaca" }}>
+                        🗑 Eliminar seleccionados
+                      </button>
+                      <button onClick={() => setSeleccionados([])}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #ede8f7", background: "#fff", color: "#888", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              <p style={{ fontSize: 11, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>
+                {filtered.length} de {leads.length} leads · clic en una fila para ver detalle
+              </p>
                 <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0ebf7", overflow: "hidden" }}>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
                       <thead>
                         <tr style={{ background: "#faf5ff" }}>
+                          <th style={{ padding: "10px 10px 10px 14px", borderBottom: "1px solid #f0ebf7" }}>
+                            <input type="checkbox"
+                              checked={seleccionados.length === filtered.length && filtered.length > 0}
+                              onChange={toggleSelectAll}
+                              style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
+                          </th>
                           {["Lead", "Tipo", "Lugar", "Celular", "Fuente", "Estado", "Actividad", ""].map(h => (
                             <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 9, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #f0ebf7" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {filtered.map((l, i) => {
-                          const dias = diasDesde(l.ultimo_contacto || l.created_at);
-                          const frio = dias > DIAS_FRIO && l.estado !== "Cerrado / Ganado";
-                          return (
-                            <tr key={l.id} onClick={() => setPanel(l)} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #faf5ff" : "none", cursor: "pointer", background: frio ? "#fff8f8" : "transparent" }}
-                              onMouseEnter={e => e.currentTarget.style.background = frio ? "#fff0f0" : "#faf5ff"}
-                              onMouseLeave={e => e.currentTarget.style.background = frio ? "#fff8f8" : "transparent"}>
-                              <td style={{ padding: "10px 14px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <div style={{ width: 28, height: 28, borderRadius: 7, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                    {l.tipo === "Administrador" ? <Users size={12} color="#f59e0b" /> : <Building2 size={12} color={PRIMARY} />}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>{l.nombre}</div>
-                                    <div style={{ fontSize: 10, color: "#ccc" }}>{l.email}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", color: l.tipo === "Administrador" ? "#f59e0b" : PRIMARY }}>{l.tipo === "Unidad Residencial" ? "Residencial" : "Admin"}</span></td>
-                              <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 3 }}><MapPin size={10} color="#ccc" />{l.lugar}</span></td>
-                              <td style={{ padding: "10px 14px" }}>
-                                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                                  <span style={{ fontSize: 11, color: "#999" }}>{l.celular}</span>
-                                  {l.celular && (
-                                    <button onClick={e => { e.stopPropagation(); setWaModal(l); }}
-                                      style={{ background: "#25D36615", color: "#25D366", padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer" }}>WA</button>
-                                  )}
-                                </div>
-                              </td>
-                              <td style={{ padding: "10px 14px" }}><span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span></td>
-                              <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}><StatusDropdown value={l.estado} onChange={v => updateEstado(l.id, v)} /></td>
-                              <td style={{ padding: "10px 14px" }}>
-                                {frio ? (
-                                  <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#fee2e2", padding: "2px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3, width: "fit-content" }}>
-                                    <AlertTriangle size={9} />{dias}d
-                                  </span>
-                                ) : <span style={{ fontSize: 10, color: "#bbb" }}>{dias === 0 ? "hoy" : `${dias}d`}</span>}
-                              </td>
-                              <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
-                                <div style={{ display: "flex", gap: 4 }}>
-                                  <button onClick={() => setModal(l)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#f5edfd", cursor: "pointer" }}><Pencil size={11} color={PRIMARY} /></button>
-                                  <button onClick={() => deleteLead(l.id)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#fef2f2", cursor: "pointer" }}><Trash2 size={11} color="#ef4444" /></button>
-                                </div>
-                              </td>
-                            </tr>
+                            {filtered.map((l, i) => {
+                              const dias = diasDesde(l.ultimo_contacto || l.created_at);
+                              const frio = dias > DIAS_FRIO && l.estado !== "Cerrado / Ganado";
+                              return (
+                                <tr key={l.id} onClick={() => setPanel(l)} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #faf5ff" : "none", cursor: "pointer", background: frio ? "#fff8f8" : "transparent" }}
+                                  onMouseEnter={e => e.currentTarget.style.background = frio ? "#fff0f0" : "#faf5ff"}
+                                  onMouseLeave={e => e.currentTarget.style.background = frio ? "#fff8f8" : "transparent"}>
+
+                                  {/* ── CHECKBOX ── */}
+                                  <td style={{ padding: "10px 10px 10px 14px" }} onClick={e => e.stopPropagation()}>
+                                    <input type="checkbox"
+                                      checked={seleccionados.includes(l.id)}
+                                      onChange={() => setSeleccionados(p => p.includes(l.id) ? p.filter(id => id !== l.id) : [...p, l.id])}
+                                      style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
+                                  </td>
+
+                                  {/* ── NOMBRE ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div style={{ width: 28, height: 28, borderRadius: 7, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                        {l.tipo === "Administrador" ? <Users size={12} color="#f59e0b" /> : <Building2 size={12} color={PRIMARY} />}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>{l.nombre}</div>
+                                        <div style={{ fontSize: 10, color: "#ccc" }}>{l.email}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* ── TIPO ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", color: l.tipo === "Administrador" ? "#f59e0b" : PRIMARY }}>
+                                      {l.tipo === "Unidad Residencial" ? "Residencial" : "Admin"}
+                                    </span>
+                                  </td>
+
+                                  {/* ── LUGAR ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 3 }}>
+                                      <MapPin size={10} color="#ccc" />{l.lugar}
+                                    </span>
+                                  </td>
+
+                                  {/* ── CELULAR ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                                      <span style={{ fontSize: 11, color: "#999" }}>{l.celular}</span>
+                                      {l.celular && (
+                                        <button onClick={e => { e.stopPropagation(); setWaModal(l); }}
+                                          style={{ background: "#25D36615", color: "#25D366", padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer" }}>WA</button>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* ── FUENTE ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span>
+                                  </td>
+
+                                  {/* ── ESTADO ── */}
+                                  <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                                    <StatusDropdown value={l.estado} onChange={v => updateEstado(l.id, v)} />
+                                  </td>
+
+                                  {/* ── ACTIVIDAD ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    {frio ? (
+                                      <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#fee2e2", padding: "2px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3, width: "fit-content" }}>
+                                        <AlertTriangle size={9} />{dias}d
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: 10, color: "#bbb" }}>{dias === 0 ? "hoy" : `${dias}d`}</span>
+                                    )}
+                                  </td>
+
+                                  {/* ── ACCIONES ── */}
+                                  <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                      <button onClick={() => setModal(l)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#f5edfd", cursor: "pointer" }}>
+                                        <Pencil size={11} color={PRIMARY} />
+                                      </button>
+                                      <button onClick={() => deleteLead(l.id)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#fef2f2", cursor: "pointer" }}>
+                                        <Trash2 size={11} color="#ef4444" />
+                                      </button>
+                                    </div>
+                                  </td>
+
+                                </tr>
                           );
                         })}
                       </tbody>
                     </table>
-                    {filtered.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#e0d0f5" }}><p style={{ fontWeight: 700, fontSize: 13 }}>Sin resultados</p></div>}
+                    {filtered.length === 0 && (
+                      <div style={{ textAlign: "center", padding: 40, color: "#e0d0f5" }}>
+                        <p style={{ fontWeight: 700, fontSize: 13 }}>Sin resultados</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
