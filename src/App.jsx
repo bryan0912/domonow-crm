@@ -650,6 +650,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState("Todos");
   const [filterEstado, setFilterEstado] = useState("Todos");
+  const [filterFuente, setFilterFuente] = useState("Todos");
   const [modal, setModal] = useState(null);
   const [panel, setPanel] = useState(null);
   const [waModal, setWaModal] = useState(null);
@@ -787,8 +788,9 @@ export default function App() {
     const q = search.toLowerCase();
     return (!q || l.nombre?.toLowerCase().includes(q) || (l.lugar || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q))
       && (filterTipo === "Todos" || l.tipo === filterTipo)
-      && (filterEstado === "Todos" || l.estado === filterEstado);
-  }), [leads, search, filterTipo, filterEstado]);
+      && (filterEstado === "Todos" || l.estado === filterEstado)
+      && (filterFuente === "Todos" || l.fuente === filterFuente);
+  }), [leads, search, filterTipo, filterEstado, filterFuente]);
 
   const kpis = useMemo(() => ({
     total: leads.length,
@@ -969,6 +971,10 @@ export default function App() {
                   </select>
                   <select value={filterEstado} onChange={e => setFilterEstado(e.target.value)} style={{ padding: "9px 10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer" }}>
                     <option>Todos</option>{ESTADOS.map(e => <option key={e.label}>{e.label}</option>)}
+                  </select>
+                  <select value={filterFuente} onChange={e => setFilterFuente(e.target.value)} style={{ padding: "9px 10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer" }}>
+                    <option>Todos</option>
+                    {FUENTES.map(f => <option key={f}>{f}</option>)}
                   </select>
                   <button onClick={() => fileRef.current.click()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 10, border: `1.5px solid ${SECONDARY}`, background: "#fffdf0", color: "#b88000", cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700 }}>
                     <Upload size={13} /> Importar
