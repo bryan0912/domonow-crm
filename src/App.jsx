@@ -11,7 +11,7 @@ import {
   Bell, Pencil, Trash2, Tag, Loader2, MessageCircle, AlertTriangle,
   CheckSquare, Square, StickyNote, Activity, PhoneCall, Coffee,
   FileCheck, BarChart2, Download, FileSpreadsheet, Target, Clock,
-  Star, TrendingDown, Award
+  Star, TrendingDown, Award, Mail
 } from "lucide-react";
 
 const PRIMARY = "#820ad1";
@@ -21,13 +21,14 @@ const DIAS_FRIO = 5;
 const ESTADOS = [
   { label: "Lead Nuevo", color: "#6366f1", bg: "#eef2ff", icon: Zap },
   { label: "Contacto Inicial", color: "#0ea5e9", bg: "#e0f2fe", icon: Phone },
+  { label: "Email Enviado", color: "#ec4899", bg: "#fdf2f8", icon: Mail },
   { label: "Cita Programada", color: "#f59e0b", bg: "#fffbeb", icon: Calendar },
   { label: "Cotización Enviada", color: "#8b5cf6", bg: "#f5f3ff", icon: Send },
   { label: "Cerrado / Ganado", color: "#10b981", bg: "#ecfdf5", icon: CheckCircle2 },
 ];
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
-const FUENTES = ["Referido", "Instagram", "WhatsApp", "Puerta a Puerta", "Llamada en Frío", "Otro"];
+const FUENTES = ["Landing","Referido", "Instagram", "WhatsApp", "Puerta a Puerta", "Llamada en Frío", "Salida de Campo", "Otro"];
 const TIPO_ACTIVIDAD = [
   { value: "llamada", label: "Llamada", icon: PhoneCall, color: "#0ea5e9" },
   { value: "reunion", label: "Reunión", icon: Coffee, color: "#f59e0b" },
@@ -38,7 +39,7 @@ const TIPO_ACTIVIDAD = [
 // ─── Plantillas WhatsApp por estado ──────────────────────────────────────────
 const WA_TEMPLATES = {
   "Lead Nuevo": (n) =>
-    `Hola ${n}, te saluda el equipo de *Domonow* 👋\n\nNos especializamos en soluciones de domótica e inteligencia para unidades residenciales en el Valle de Aburrá.\n\n¿Tienes unos minutos para que te contemos cómo podemos ayudarles?`,
+    `Hola ${n}, te saluda el equipo de *Domonow* 👋\n\nNos especializamos en soluciones integrales e inteligentes para unidades residenciales en el Valle de Aburrá.\n\n¿Tienes unos minutos para que te contemos cómo podemos ayudarles?`,
   "Contacto Inicial": (n) =>
     `Hola ${n}, qué gusto saludarte nuevamente 😊\n\nQuería hacer seguimiento a nuestra conversación sobre los servicios de *Domonow*.\n\n¿Pudiste comentarlo? ¿Quedó alguna duda que pueda resolver?`,
   "Cita Programada": (n) =>
@@ -130,38 +131,122 @@ function WhatsAppModal({ lead, onClose }) {
 
 // ─── Modal Crear/Editar Lead ──────────────────────────────────────────────────
 function LeadModal({ lead, onClose, onSave, saving }) {
-  const [f, setF] = useState(lead || { nombre: "", tipo: "Unidad Residencial", lugar: "", celular: "", email: "", fuente: "Referido", estado: "Lead Nuevo", notas: "" });
+  const [f, setF] = useState(lead || {
+    nombre: "", tipo: "Unidad Residencial", lugar: "",
+    celular: "", telefono: "", email: "", fuente: "Referido",
+    estado: "Lead Nuevo", notas: "", contacto_nombre: "", unidades: ""
+  });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const inp = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1.5px solid #ede8f7", fontFamily: "Montserrat, sans-serif", fontSize: 13, outline: "none", color: "#1A1A1A", boxSizing: "border-box" };
   const lbl = { fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 };
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)" }}>
-      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 460, margin: "0 16px", overflow: "hidden", boxShadow: "0 24px 64px rgba(130,10,209,0.2)" }}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 500, margin: "0 16px", overflow: "hidden", boxShadow: "0 24px 64px rgba(130,10,209,0.2)" }}>
+
+        {/* Header */}
         <div style={{ background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, padding: "18px 22px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: 16, fontFamily: "Montserrat, sans-serif" }}>{lead ? "Editar Lead" : "Nuevo Lead"}</span>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, padding: 5, cursor: "pointer", display: "flex" }}><X size={16} color="#fff" /></button>
-        </div>
-        <div style={{ padding: 22, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxHeight: "60vh", overflowY: "auto" }}>
-          <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Nombre / Unidad</label><input style={inp} value={f.nombre || ""} onChange={e => set("nombre", e.target.value)} /></div>
-          <div><label style={lbl}>Tipo</label><select style={{ ...inp, background: "#fff" }} value={f.tipo} onChange={e => set("tipo", e.target.value)}>{TIPOS.map(t => <option key={t}>{t}</option>)}</select></div>
-          <div><label style={lbl}>Lugar</label><input style={inp} value={f.lugar || ""} onChange={e => set("lugar", e.target.value)} /></div>
-          <div><label style={lbl}>Celular</label><input style={inp} value={f.celular || ""} onChange={e => set("celular", e.target.value)} /></div>
-          <div><label style={lbl}>Fuente</label><select style={{ ...inp, background: "#fff" }} value={f.fuente} onChange={e => set("fuente", e.target.value)}>{FUENTES.map(s => <option key={s}>{s}</option>)}</select></div>
-          <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Email</label><input style={inp} type="email" value={f.email || ""} onChange={e => set("email", e.target.value)} /></div>
-          <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Estado</label><select style={{ ...inp, background: "#fff" }} value={f.estado} onChange={e => set("estado", e.target.value)}>{ESTADOS.map(e => <option key={e.label}>{e.label}</option>)}</select></div>
-          <div style={{ gridColumn: "1/-1" }}><label style={lbl}>Notas</label><textarea style={{ ...inp, height: 70, resize: "none" }} value={f.notas || ""} onChange={e => set("notas", e.target.value)} /></div>
-        </div>
-        <div style={{ padding: "14px 22px", borderTop: "1px solid #f5f0fb", display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 700, color: "#888", cursor: "pointer" }}>Cancelar</button>
-          <button onClick={() => onSave(f)} disabled={saving} style={{ flex: 2, padding: "10px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.7 : 1 }}>
-            {saving && <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />}
-            {lead ? "Guardar" : "Crear Lead"}
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: 16, fontFamily: "Montserrat, sans-serif" }}>
+            {lead ? "Editar Lead" : "Nuevo Lead"}
+          </span>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, padding: 5, cursor: "pointer", display: "flex" }}>
+            <X size={16} color="#fff" />
           </button>
         </div>
+
+        {/* Campos */}
+        <div style={{ padding: 22, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxHeight: "62vh", overflowY: "auto" }}>
+
+          {/* Nombre */}
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={lbl}>Nombre / Unidad</label>
+            <input style={inp} value={f.nombre || ""} onChange={e => set("nombre", e.target.value)} placeholder="Ej: Torres del Norte" />
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <label style={lbl}>Tipo</label>
+            <select style={{ ...inp, background: "#fff" }} value={f.tipo} onChange={e => set("tipo", e.target.value)}>
+              {TIPOS.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+
+          {/* Lugar */}
+          <div>
+            <label style={lbl}>Lugar / Municipio</label>
+            <input style={inp} value={f.lugar || ""} onChange={e => set("lugar", e.target.value)} placeholder="Ej: Medellín" />
+          </div>
+
+          {/* Celular */}
+          <div>
+            <label style={lbl}>Celular</label>
+            <input style={inp} value={f.celular || ""} onChange={e => set("celular", e.target.value)} placeholder="310 000 0000" />
+          </div>
+
+          {/* Teléfono fijo */}
+          <div>
+            <label style={lbl}>Teléfono Fijo</label>
+            <input style={inp} value={f.telefono || ""} onChange={e => set("telefono", e.target.value)} placeholder="604 000 0000" />
+          </div>
+
+          {/* Email */}
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={lbl}>Correo Electrónico</label>
+            <input style={inp} type="email" value={f.email || ""} onChange={e => set("email", e.target.value)} placeholder="correo@ejemplo.com" />
+          </div>
+
+          {/* Nombre contacto */}
+          <div>
+            <label style={lbl}>Nombre Contacto</label>
+            <input style={inp} value={f.contacto_nombre || ""} onChange={e => set("contacto_nombre", e.target.value)} placeholder="Ej: Carlos Pérez" />
+          </div>
+
+          {/* Unidades */}
+          <div>
+            <label style={lbl}>N° de Unidades</label>
+            <input style={inp} type="number" value={f.unidades || ""} onChange={e => set("unidades", e.target.value)} placeholder="Ej: 120" />
+          </div>
+
+          {/* Fuente */}
+          <div>
+            <label style={lbl}>Fuente</label>
+            <select style={{ ...inp, background: "#fff" }} value={f.fuente} onChange={e => set("fuente", e.target.value)}>
+              {FUENTES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Estado */}
+          <div>
+            <label style={lbl}>Estado</label>
+            <select style={{ ...inp, background: "#fff" }} value={f.estado} onChange={e => set("estado", e.target.value)}>
+              {ESTADOS.map(e => <option key={e.label}>{e.label}</option>)}
+            </select>
+          </div>
+
+          {/* Notas */}
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={lbl}>Notas</label>
+            <textarea style={{ ...inp, height: 70, resize: "none" }} value={f.notas || ""} onChange={e => set("notas", e.target.value)} placeholder="Información relevante sobre este lead..." />
+          </div>
+
+        </div>
+
+        {/* Botones */}
+        <div style={{ padding: "14px 22px", borderTop: "1px solid #f5f0fb", display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 700, color: "#888", cursor: "pointer" }}>
+            Cancelar
+          </button>
+          <button onClick={() => onSave(f)} disabled={saving} style={{ flex: 2, padding: "10px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${PRIMARY}, #a020f0)`, color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 13, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.7 : 1 }}>
+            {saving && <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />}
+            {lead ? "Guardar Cambios" : "Crear Lead"}
+          </button>
+        </div>
+
       </div>
     </div>
   );
 }
+
 
 // ─── Panel Detalle Lead ───────────────────────────────────────────────────────
 function LeadPanel({ lead, onClose, onUpdate, onWhatsApp }) {
@@ -580,18 +665,41 @@ export default function App() {
   }
 
   async function save(form) {
-    setSaving(true);
-    if (form.id) {
-      const { error } = await supabase.from("leads").update({ nombre: form.nombre, tipo: form.tipo, lugar: form.lugar, celular: form.celular, email: form.email, fuente: form.fuente, estado: form.estado, notas: form.notas }).eq("id", form.id);
-      if (!error) setLeads(p => p.map(l => l.id === form.id ? { ...l, ...form } : l));
-    } else {
-      const { data } = await supabase.from("leads").insert([{ nombre: form.nombre, tipo: form.tipo, lugar: form.lugar, celular: form.celular, email: form.email, fuente: form.fuente, estado: form.estado, notas: form.notas }]).select();
-      if (data) setLeads(p => [data[0], ...p]);
-    }
-    setSaving(false);
-    setModal(null);
+  setSaving(true);
+  if (form.id) {
+    const { error } = await supabase.from("leads").update({ 
+      nombre: form.nombre, 
+      tipo: form.tipo, 
+      lugar: form.lugar, 
+      celular: form.celular, 
+      telefono: form.telefono,
+      email: form.email, 
+      fuente: form.fuente, 
+      estado: form.estado, 
+      notas: form.notas,
+      contacto_nombre: form.contacto_nombre, 
+      unidades: form.unidades 
+    }).eq("id", form.id);
+    if (!error) setLeads(p => p.map(l => l.id === form.id ? { ...l, ...form } : l));
+  } else {
+    const { data } = await supabase.from("leads").insert([{ 
+      nombre: form.nombre, 
+      tipo: form.tipo, 
+      lugar: form.lugar, 
+      celular: form.celular, 
+      telefono: form.telefono,
+      email: form.email, 
+      fuente: form.fuente, 
+      estado: form.estado, 
+      notas: form.notas,
+      contacto_nombre: form.contacto_nombre, 
+      unidades: form.unidades 
+    }]).select();
+    if (data) setLeads(p => [data[0], ...p]);
   }
-
+  setSaving(false);
+  setModal(null);
+}
   async function deleteLead(id) {
     await supabase.from("leads").delete().eq("id", id);
     setLeads(p => p.filter(l => l.id !== id));
@@ -630,19 +738,46 @@ export default function App() {
     reader.onload = async ev => {
       const wb = XLSX.read(ev.target.result, { type: "binary" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(ws);
-      const newLeads = data.map(row => ({
-        nombre: row["Nombre Unidad"] || row["Nombre / Unidad"] || row["nombre"] || "",
-        tipo: row["Tipo"] || "Unidad Residencial",
-        lugar: row["Lugar"] || "",
-        celular: row["Celular"] || "",
-        email: row["Email"] || "",
-        fuente: row["Fuente"] || "Otro",
-        estado: row["Estado"] || "Lead Nuevo",
-        notas: row["Notas"] || "",
-      })).filter(l => l.nombre);
-      const { data: inserted } = await supabase.from("leads").insert(newLeads).select();
-      if (inserted) setLeads(p => [...inserted, ...p]);
+      const data = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const newLeads = data.map(row => {
+        // Normaliza claves: quita espacios y convierte a minúsculas
+        const r = {};
+        Object.keys(row).forEach(k => { r[k.trim().toLowerCase()] = String(row[k] || "").trim(); });
+
+        return {
+          nombre: r["lead"] || r["nombre unidad"] || r["nombre"] || "",
+          tipo: (() => {
+            const t = (r["tipo"] || "").toLowerCase().trim();
+            if (t.includes("admin")) return "Administrador";
+            return "Unidad Residencial";
+          })(),
+          lugar: r["lugar"] || "",
+          celular: r["celular"] || "",
+          telefono: r["telefono"] || r["teléfono"] || "",
+          email: r["email"] || "",
+          fuente: r["fuente"] || "Otro",
+          estado: r["estado"] || "Lead Nuevo",
+          notas: r["notas"] || "",
+          contacto_nombre: r["contacto"] || r["contacto_nombre"] || "",
+          unidades: parseInt(r["unidades"]) || 0,
+        };
+        }).filter(l => l.nombre);
+
+      if (newLeads.length === 0) {
+        alert("No se encontraron contactos. Verifica que el archivo tenga datos y que la primera fila sea el encabezado.");
+        return;
+      }
+
+      const { data: inserted, error } = await supabase.from("leads").insert(newLeads).select();
+      if (error) {
+        alert("Error al importar: " + error.message);
+        return;
+      }
+      if (inserted) {
+        setLeads(p => [...inserted, ...p]);
+        alert(`✅ ${inserted.length} contactos importados correctamente`);
+      }
     };
     reader.readAsBinaryString(file);
     e.target.value = "";
