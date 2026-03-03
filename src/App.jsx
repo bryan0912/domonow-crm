@@ -19,12 +19,17 @@ const SECONDARY = "#F7B500";
 const DIAS_FRIO = 5;
 
 const ESTADOS = [
-  { label: "Lead Nuevo", color: "#6366f1", bg: "#eef2ff", icon: Zap },
-  { label: "Contacto Inicial", color: "#0ea5e9", bg: "#e0f2fe", icon: Phone },
-  { label: "Email Enviado", color: "#ec4899", bg: "#fdf2f8", icon: Mail },
-  { label: "Cita Programada", color: "#f59e0b", bg: "#fffbeb", icon: Calendar },
-  { label: "Cotización Enviada", color: "#8b5cf6", bg: "#f5f3ff", icon: Send },
-  { label: "Cerrado / Ganado", color: "#10b981", bg: "#ecfdf5", icon: CheckCircle2 },
+  { label: "Lead Nuevo",          color: "#6366f1", bg: "#eef2ff", icon: Zap },
+  { label: "Contacto Inicial",    color: "#0ea5e9", bg: "#e0f2fe", icon: Phone },
+  { label: "Email Enviado",       color: "#ec4899", bg: "#fdf2f8", icon: Mail },
+  { label: "En Seguimiento",      color: "#8b5cf6", bg: "#f5f3ff", icon: Activity },
+  { label: "Reagendar",           color: "#f97316", bg: "#fff7ed", icon: Clock },
+  { label: "Cita Programada",     color: "#f59e0b", bg: "#fffbeb", icon: Calendar },
+  { label: "Cotización Enviada",  color: "#06b6d4", bg: "#ecfeff", icon: Send },
+  { label: "En Negociación",      color: "#a855f7", bg: "#faf5ff", icon: TrendingUp },
+  { label: "Cerrado / Ganado",    color: "#10b981", bg: "#ecfdf5", icon: CheckCircle2 },
+  { label: "No Interesado",       color: "#94a3b8", bg: "#f8fafc", icon: X },
+  { label: "Perdido / Descartado",color: "#ef4444", bg: "#fef2f2", icon: TrendingDown },
 ];
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
@@ -50,6 +55,39 @@ const WA_TEMPLATES = {
     `Hola ${n} 🎉\n\n¡Bienvenido a la familia *Domonow*!\n\nEn los próximos días nuestro equipo técnico se pondrá en contacto para coordinar la instalación.\n\n¡Gracias por confiar en nosotros!`,
 };
 
+function normalizarFuente(valor) {
+  const v = (valor || "").toLowerCase().trim();
+  if (v.includes("referid"))                                return "Referido";
+  if (v.includes("instagram") || v === "ig")                return "Instagram";
+  if (v.includes("whatsapp") || v === "wa" || v === "wsp")  return "WhatsApp";
+  if (v.includes("linkedin"))                               return "LinkedIn";
+  if (v.includes("puerta"))                                 return "Puerta a Puerta";
+  if (v.includes("llamada") || v.includes("fria") || v.includes("fría")) return "Llamada en Frío";
+  if (v.includes("campo") || v.includes("salida"))          return "Salida de Campo";
+  return "Otro";
+}
+
+function normalizarTipo(valor) {
+  const v = (valor || "").toLowerCase().trim();
+  if (v.includes("admin")) return "Administrador";
+  return "Unidad Residencial";
+}
+
+function normalizarEstado(valor) {
+  const v = (valor || "").toLowerCase().trim();
+  if (v.includes("nuevo") || v === "")                       return "Lead Nuevo";
+  if (v.includes("contacto") || v.includes("inicial"))       return "Contacto Inicial";
+  if (v.includes("email") || v.includes("correo"))           return "Email Enviado";
+  if (v.includes("seguimiento"))                             return "En Seguimiento";
+  if (v.includes("reagend"))                                 return "Reagendar";
+  if (v.includes("cita") || v.includes("programad"))         return "Cita Programada";
+  if (v.includes("cotiz"))                                   return "Cotización Enviada";
+  if (v.includes("negoci"))                                  return "En Negociación";
+  if (v.includes("ganado") || v.includes("cerrado") || v.includes("contrato")) return "Cerrado / Ganado";
+  if (v.includes("no inter") || v.includes("interesado"))    return "No Interesado";
+  if (v.includes("perdido") || v.includes("descart"))        return "Perdido / Descartado";
+  return "Lead Nuevo";
+}
 function diasDesde(fecha) {
   if (!fecha) return 999;
   return Math.floor((new Date() - new Date(fecha)) / (1000 * 60 * 60 * 24));
@@ -794,21 +832,17 @@ function toggleSelectAll() {
         Object.keys(row).forEach(k => { r[k.trim().toLowerCase()] = String(row[k] || "").trim(); });
 
         return {
-          nombre: r["lead"] || r["nombre unidad"] || r["nombre"] || "",
-          tipo: (() => {
-            const t = (r["tipo"] || "").toLowerCase().trim();
-            if (t.includes("admin")) return "Administrador";
-            return "Unidad Residencial";
-          })(),
-          lugar: r["lugar"] || "",
-          celular: r["celular"] || "",
-          telefono: r["telefono"] || r["teléfono"] || "",
-          email: r["email"] || "",
-          fuente: r["fuente"] || "Otro",
-          estado: r["estado"] || "Lead Nuevo",
-          notas: r["notas"] || "",
+          nombre:          r["lead"] || r["nombre unidad"] || r["nombre"] || "",
+          tipo:            normalizarTipo(r["tipo"]),
+          lugar:           r["lugar"] || "",
+          celular:         r["celular"] || "",
+          telefono:        r["telefono"] || r["teléfono"] || "",
+          email:           r["email"] || "",
+          fuente:          normalizarFuente(r["fuente"]),
+          estado:          normalizarEstado(r["estado"]),
+          notas:           r["notas"] || "",
           contacto_nombre: r["contacto"] || r["contacto_nombre"] || "",
-          unidades: parseInt(r["unidades"]) || 0,
+          unidades:        parseInt(r["unidades"]) || 0,
         };
         }).filter(l => l.nombre);
 
