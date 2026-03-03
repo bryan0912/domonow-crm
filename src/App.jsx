@@ -670,37 +670,40 @@ export default function App() {
 
   async function save(form) {
   setSaving(true);
+
+  const payload = {
+    nombre:          form.nombre          || "",
+    tipo:            form.tipo            || "Unidad Residencial",
+    lugar:           form.lugar           || "",
+    celular:         form.celular         || "",
+    telefono:        form.telefono        || "",
+    email:           form.email           || "",
+    fuente:          form.fuente          || "Otro",
+    estado:          form.estado          || "Lead Nuevo",
+    notas:           form.notas           || "",
+    contacto_nombre: form.contacto_nombre || "",
+    unidades:        parseInt(form.unidades) || 0,
+  };
+
   if (form.id) {
-    const { error } = await supabase.from("leads").update({ 
-      nombre: form.nombre, 
-      tipo: form.tipo, 
-      lugar: form.lugar, 
-      celular: form.celular, 
-      telefono: form.telefono,
-      email: form.email, 
-      fuente: form.fuente, 
-      estado: form.estado, 
-      notas: form.notas,
-      contacto_nombre: form.contacto_nombre, 
-      unidades: form.unidades 
-    }).eq("id", form.id);
-    if (!error) setLeads(p => p.map(l => l.id === form.id ? { ...l, ...form } : l));
+    const { error } = await supabase
+      .from("leads")
+      .update(payload)
+      .eq("id", form.id);
+    if (!error) setLeads(p => p.map(l => l.id === form.id ? { ...l, ...payload } : l));
   } else {
-    const { data } = await supabase.from("leads").insert([{ 
-      nombre: form.nombre, 
-      tipo: form.tipo, 
-      lugar: form.lugar, 
-      celular: form.celular, 
-      telefono: form.telefono,
-      email: form.email, 
-      fuente: form.fuente, 
-      estado: form.estado, 
-      notas: form.notas,
-      contacto_nombre: form.contacto_nombre, 
-      unidades: form.unidades 
-    }]).select();
+    const { data, error } = await supabase
+      .from("leads")
+      .insert([payload])
+      .select();
+    if (error) {
+      alert("Error al guardar: " + error.message);
+      setSaving(false);
+      return;
+    }
     if (data) setLeads(p => [data[0], ...p]);
   }
+
   setSaving(false);
   setModal(null);
 }
@@ -1044,7 +1047,7 @@ function toggleSelectAll() {
                         Aplicar
                       </button>
                       <button onClick={eliminarSeleccionados}
-                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#fef2f2", color: "#ef4444", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1.5px solid #fecaca" }}>
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #fecaca", background: "#fef2f2", color: "#ef4444", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                         🗑 Eliminar seleccionados
                       </button>
                       <button onClick={() => setSeleccionados([])}
