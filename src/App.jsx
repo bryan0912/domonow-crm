@@ -19,17 +19,17 @@ const SECONDARY = "#F7B500";
 const DIAS_FRIO = 5;
 
 const ESTADOS = [
-  { label: "Lead Nuevo",          color: "#6366f1", bg: "#eef2ff", icon: Zap },
-  { label: "Contacto Inicial",    color: "#0ea5e9", bg: "#e0f2fe", icon: Phone },
-  { label: "Email Enviado",       color: "#ec4899", bg: "#fdf2f8", icon: Mail },
+  { label: "Lead Nuevo",           color: "#6366f1", bg: "#eef2ff", icon: Zap },
+  { label: "Contacto Inicial",     color: "#0ea5e9", bg: "#e0f2fe", icon: Phone },
+  { label: "Email Enviado",        color: "#ec4899", bg: "#fdf2f8", icon: Mail },
+  { label: "WhatsApp Enviado",     color: "#25D366", bg: "#f0fdf4", icon: MessageCircle }, // NUEVO
   { label: "En Seguimiento",      color: "#8b5cf6", bg: "#f5f3ff", icon: Activity },
-  { label: "Reagendar",           color: "#f97316", bg: "#fff7ed", icon: Clock },
-  { label: "Cita Programada",     color: "#f59e0b", bg: "#fffbeb", icon: Calendar },
-  { label: "Cotización Enviada",  color: "#06b6d4", bg: "#ecfeff", icon: Send },
-  { label: "En Negociación",      color: "#a855f7", bg: "#faf5ff", icon: TrendingUp },
-  { label: "Cerrado / Ganado",    color: "#10b981", bg: "#ecfdf5", icon: CheckCircle2 },
-  { label: "No Interesado",       color: "#94a3b8", bg: "#f8fafc", icon: X },
-  { label: "Perdido / Descartado",color: "#ef4444", bg: "#fef2f2", icon: TrendingDown },
+  { label: "Reagendar",            color: "#f97316", bg: "#fff7ed", icon: Clock },
+  { label: "Cita Programada",      color: "#f59e0b", bg: "#fffbeb", icon: Calendar },
+  { label: "Cotización Enviada",   color: "#06b6d4", bg: "#ecfeff", icon: Send },
+  { label: "Cerrado / Ganado",     color: "#10b981", bg: "#ecfdf5", icon: CheckCircle2 },
+  { label: "No Interesado",        color: "#94a3b8", bg: "#f8fafc", icon: X },
+  { label: "Perdido / Descartado", color: "#ef4444", bg: "#fef2f2", icon: TrendingDown },
 ];
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
@@ -78,6 +78,7 @@ function normalizarEstado(valor) {
   if (v.includes("nuevo") || v === "")                       return "Lead Nuevo";
   if (v.includes("contacto") || v.includes("inicial"))       return "Contacto Inicial";
   if (v.includes("email") || v.includes("correo"))           return "Email Enviado";
+  if (v.includes("whatsapp") || v.includes("wha"))           return "WhatsApp Enviado";
   if (v.includes("seguimiento"))                             return "En Seguimiento";
   if (v.includes("reagend"))                                 return "Reagendar";
   if (v.includes("cita") || v.includes("programad"))         return "Cita Programada";
