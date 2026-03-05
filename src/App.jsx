@@ -33,7 +33,11 @@ const ESTADOS = [
 ];
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
-const FUENTES = ["Landing","Referido", "Instagram", "WhatsApp", "Puerta a Puerta", "Llamada en Frío", "Salida de Campo","Apollo","Linkedln", "Otro"];
+const FUENTES = [
+  "Referido", "Instagram", "WhatsApp", "LinkedIn",
+  "Puerta a Puerta", "Llamada en Frío", "Salida de Campo",
+  "Google/Gemini", "Otro"
+];
 const TIPO_ACTIVIDAD = [
   { value: "llamada", label: "Llamada", icon: PhoneCall, color: "#0ea5e9" },
   { value: "reunion", label: "Reunión", icon: Coffee, color: "#f59e0b" },
@@ -61,6 +65,7 @@ function normalizarFuente(valor) {
   if (v.includes("instagram") || v === "ig")                return "Instagram";
   if (v.includes("whatsapp") || v === "wa" || v === "wsp")  return "WhatsApp";
   if (v.includes("linkedin"))                               return "LinkedIn";
+  if (v.includes("google") || v.includes("gemini")) return "Google/Gemini";
   if (v.includes("puerta"))                                 return "Puerta a Puerta";
   if (v.includes("llamada") || v.includes("fria") || v.includes("fría")) return "Llamada en Frío";
   if (v.includes("campo") || v.includes("salida"))          return "Salida de Campo";
