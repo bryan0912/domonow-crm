@@ -695,6 +695,8 @@ export default function App() {
   const [filterTipo, setFilterTipo] = useState("Todos");
   const [filterEstado, setFilterEstado] = useState("Todos");
   const [filterFuente, setFilterFuente] = useState("Todos");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [seleccionados, setSeleccionados] = useState([]);
   const [bulkEstado, setBulkEstado] = useState("");
   const [ultimaImportacion, setUltimaImportacion] = useState([]);
@@ -806,6 +808,7 @@ function toggleSelectAll() {
   // ── Exportar Excel ──
   function exportarExcel() {
     const datos = leads.map(l => ({
+      "ID": l.numero ? `DON-${String(l.numero).padStart(3, "0")}` : "",
       "Nombre / Unidad": l.nombre,
       "Tipo": l.tipo,
       "Lugar": l.lugar,
@@ -1121,107 +1124,117 @@ function toggleSelectAll() {
                               onChange={toggleSelectAll}
                               style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
                           </th>
-                          {["", "#", "Lead", "Tipo", "Lugar", "Celular", "Fuente", "Estado", "Actividad", ""].map(h => (
+                          {["#", "Lead", "Tipo", "Lugar", "Celular", "Fuente", "Estado", "Fecha", "Actividad", ""].map(h => (
                             <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 9, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #f0ebf7" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                            {filtered.map((l, i) => {
-                              const dias = diasDesde(l.ultimo_contacto || l.created_at);
-                              const frio = dias > DIAS_FRIO && l.estado !== "Cerrado / Ganado";
-                              return (
-                                <tr key={l.id} onClick={() => setPanel(l)} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #faf5ff" : "none", cursor: "pointer", background: frio ? "#fff8f8" : "transparent" }}
-                                  onMouseEnter={e => e.currentTarget.style.background = frio ? "#fff0f0" : "#faf5ff"}
-                                  onMouseLeave={e => e.currentTarget.style.background = frio ? "#fff8f8" : "transparent"}>
+                          {filtered.map((l, i) => {
+                            const dias = diasDesde(l.ultimo_contacto || l.created_at);
+                            const frio = dias > DIAS_FRIO && l.estado !== "Cerrado / Ganado";
+                            return (
+                              <tr key={l.id} onClick={() => setPanel(l)} style={{ borderBottom: i < filtered.length - 1 ? "1px solid #faf5ff" : "none", cursor: "pointer", background: frio ? "#fff8f8" : "transparent" }}
+                                onMouseEnter={e => e.currentTarget.style.background = frio ? "#fff0f0" : "#faf5ff"}
+                                onMouseLeave={e => e.currentTarget.style.background = frio ? "#fff8f8" : "transparent"}>
 
-                                  {/* ── CHECKBOX ── */}
-                                  <td style={{ padding: "10px 10px 10px 14px" }} onClick={e => e.stopPropagation()}>
-                                    <input type="checkbox"
-                                      checked={seleccionados.includes(l.id)}
-                                      onChange={() => setSeleccionados(p => p.includes(l.id) ? p.filter(id => id !== l.id) : [...p, l.id])}
-                                      style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
-                                  </td>
-                                  
-                                  {/* ── NOMBRE ── */}
-                                  <td style={{ padding: "10px 14px" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                      <div style={{ width: 28, height: 28, borderRadius: 7, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        {l.tipo === "Administrador" ? <Users size={12} color="#f59e0b" /> : <Building2 size={12} color={PRIMARY} />}
-                                      </div>
-                                      <div>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>{l.nombre}</div>
-                                        <div style={{ fontSize: 10, color: "#ccc" }}>{l.email}</div>
-                                      </div>
+                                {/* ── CHECKBOX ── */}
+                                <td style={{ padding: "10px 10px 10px 14px" }} onClick={e => e.stopPropagation()}>
+                                  <input type="checkbox"
+                                    checked={seleccionados.includes(l.id)}
+                                    onChange={() => setSeleccionados(p => p.includes(l.id) ? p.filter(id => id !== l.id) : [...p, l.id])}
+                                    style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
+                                </td>
+
+                                {/* ── ID ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", background: "#f5f5f5", padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>
+                                    {l.numero ? `DON-${String(l.numero).padStart(3, "0")}` : "—"}
+                                  </span>
+                                </td>
+
+                                {/* ── NOMBRE ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: 7, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                      {l.tipo === "Administrador" ? <Users size={12} color="#f59e0b" /> : <Building2 size={12} color={PRIMARY} />}
                                     </div>
-                                  </td>
-                                    <td style={{ padding: "10px 14px" }}>
-                                      <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", background: "#f5f5f5", padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>
-                                        {l.numero ? `DON-${String(l.numero).padStart(3, "0")}` : "—"}
-                                      </span>
-                                    </td>
-                                  {/* ── TIPO ── */}
-                                  <td style={{ padding: "10px 14px" }}>
-                                    <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", color: l.tipo === "Administrador" ? "#f59e0b" : PRIMARY }}>
-                                      {l.tipo === "Unidad Residencial" ? "Residencial" : "Admin"}
-                                    </span>
-                                  </td>
-
-                                  {/* ── LUGAR ── */}
-                                  <td style={{ padding: "10px 14px" }}>
-                                    <span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 3 }}>
-                                      <MapPin size={10} color="#ccc" />{l.lugar}
-                                    </span>
-                                  </td>
-
-                                  {/* ── CELULAR ── */}
-                                  <td style={{ padding: "10px 14px" }}>
-                                    <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                                      <span style={{ fontSize: 11, color: "#999" }}>{l.celular}</span>
-                                      {l.celular && (
-                                        <button onClick={e => { e.stopPropagation(); setWaModal(l); }}
-                                          style={{ background: "#25D36615", color: "#25D366", padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer" }}>WA</button>
-                                      )}
+                                    <div>
+                                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>{l.nombre}</div>
+                                      <div style={{ fontSize: 10, color: "#ccc" }}>{l.email}</div>
                                     </div>
-                                  </td>
+                                  </div>
+                                </td>
 
-                                  {/* ── FUENTE ── */}
-                                  <td style={{ padding: "10px 14px" }}>
-                                    <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span>
-                                  </td>
+                                {/* ── TIPO ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", color: l.tipo === "Administrador" ? "#f59e0b" : PRIMARY }}>
+                                    {l.tipo === "Unidad Residencial" ? "Residencial" : "Admin"}
+                                  </span>
+                                </td>
 
-                                  {/* ── ESTADO ── */}
-                                  <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
-                                    <StatusDropdown value={l.estado} onChange={v => updateEstado(l.id, v)} />
-                                  </td>
+                                {/* ── LUGAR ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 3 }}>
+                                    <MapPin size={10} color="#ccc" />{l.lugar}
+                                  </span>
+                                </td>
 
-                                  {/* ── ACTIVIDAD ── */}
-                                  <td style={{ padding: "10px 14px" }}>
-                                    {frio ? (
-                                      <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#fee2e2", padding: "2px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3, width: "fit-content" }}>
-                                        <AlertTriangle size={9} />{dias}d
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: 10, color: "#bbb" }}>{dias === 0 ? "hoy" : `${dias}d`}</span>
+                                {/* ── CELULAR ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                                    <span style={{ fontSize: 11, color: "#999" }}>{l.celular}</span>
+                                    {l.celular && (
+                                      <button onClick={e => { e.stopPropagation(); setWaModal(l); }}
+                                        style={{ background: "#25D36615", color: "#25D366", padding: "2px 7px", borderRadius: 6, fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer" }}>WA</button>
                                     )}
-                                  </td>
+                                  </div>
+                                </td>
 
-                                  {/* ── ACCIONES ── */}
-                                  <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
-                                    <div style={{ display: "flex", gap: 4 }}>
-                                      <button onClick={() => setModal(l)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#f5edfd", cursor: "pointer" }}>
-                                        <Pencil size={11} color={PRIMARY} />
-                                      </button>
-                                      <button onClick={() => deleteLead(l.id)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#fef2f2", cursor: "pointer" }}>
-                                        <Trash2 size={11} color="#ef4444" />
-                                      </button>
-                                    </div>
-                                  </td>
+                                {/* ── FUENTE ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span>
+                                </td>
 
-                                </tr>
-                          );
-                        })}
-                      </tbody>
+                                {/* ── ESTADO ── */}
+                                <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                                  <StatusDropdown value={l.estado} onChange={v => updateEstado(l.id, v)} />
+                                </td>
+
+                                {/* ── FECHA ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  <span style={{ fontSize: 10, color: "#bbb", whiteSpace: "nowrap" }}>
+                                    {l.created_at ? new Date(l.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "2-digit" }) : "—"}
+                                  </span>
+                                </td>
+
+                                {/* ── ACTIVIDAD ── */}
+                                <td style={{ padding: "10px 14px" }}>
+                                  {frio ? (
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#fee2e2", padding: "2px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3, width: "fit-content" }}>
+                                      <AlertTriangle size={9} />{dias}d
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: 10, color: "#bbb" }}>{dias === 0 ? "hoy" : `${dias}d`}</span>
+                                  )}
+                                </td>
+
+                                {/* ── ACCIONES ── */}
+                                <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                                  <div style={{ display: "flex", gap: 4 }}>
+                                    <button onClick={() => setModal(l)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#f5edfd", cursor: "pointer" }}>
+                                      <Pencil size={11} color={PRIMARY} />
+                                    </button>
+                                    <button onClick={() => deleteLead(l.id)} style={{ padding: 5, borderRadius: 6, border: "none", background: "#fef2f2", cursor: "pointer" }}>
+                                      <Trash2 size={11} color="#ef4444" />
+                                    </button>
+                                  </div>
+                                </td>
+
+                              </tr>
+                            );
+                          })}
+                        </tbody>
                     </table>
                     {filtered.length === 0 && (
                       <div style={{ textAlign: "center", padding: 40, color: "#e0d0f5" }}>
