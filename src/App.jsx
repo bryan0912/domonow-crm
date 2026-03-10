@@ -873,12 +873,21 @@ function toggleSelectAll() {
   };
 
   const filtered = useMemo(() => leads.filter(l => {
-    const q = search.toLowerCase();
-    return (!q || l.nombre?.toLowerCase().includes(q) || (l.lugar || "").toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q))
-      && (filterTipo === "Todos" || l.tipo === filterTipo)
-      && (filterEstado === "Todos" || l.estado === filterEstado)
-      && (filterFuente === "Todos" || l.fuente === filterFuente);
-  }), [leads, search, filterTipo, filterEstado, filterFuente]);
+  const q = search.toLowerCase();
+  return (
+    !q ||
+    l.nombre?.toLowerCase().includes(q) ||
+    (l.lugar || "").toLowerCase().includes(q) ||
+    (l.email || "").toLowerCase().includes(q) ||
+    (l.numero ? `don-${l.numero}` : "").includes(q) ||
+    (l.numero ? String(l.numero) : "").includes(q)
+  )
+  && (filterTipo === "Todos" || l.tipo === filterTipo)
+  && (filterEstado === "Todos" || l.estado === filterEstado)
+  && (filterFuente === "Todos" || l.fuente === filterFuente)
+  && (!fechaDesde || new Date(l.created_at) >= new Date(fechaDesde))
+  && (!fechaHasta || new Date(l.created_at) <= new Date(fechaHasta + "T23:59:59"));
+}), [leads, search, filterTipo, filterEstado, filterFuente, fechaDesde, fechaHasta]);
 
   const kpis = useMemo(() => ({
     total: leads.length,
@@ -1112,7 +1121,7 @@ function toggleSelectAll() {
                               onChange={toggleSelectAll}
                               style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
                           </th>
-                          {["Lead", "Tipo", "Lugar", "Celular", "Fuente", "Estado", "Actividad", ""].map(h => (
+                          {["", "#", "Lead", "Tipo", "Lugar", "Celular", "Fuente", "Estado", "Actividad", ""].map(h => (
                             <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 9, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #f0ebf7" }}>{h}</th>
                           ))}
                         </tr>
@@ -1133,7 +1142,7 @@ function toggleSelectAll() {
                                       onChange={() => setSeleccionados(p => p.includes(l.id) ? p.filter(id => id !== l.id) : [...p, l.id])}
                                       style={{ cursor: "pointer", accentColor: PRIMARY, width: 14, height: 14 }} />
                                   </td>
-
+                                  
                                   {/* ── NOMBRE ── */}
                                   <td style={{ padding: "10px 14px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1146,7 +1155,11 @@ function toggleSelectAll() {
                                       </div>
                                     </div>
                                   </td>
-
+                                    <td style={{ padding: "10px 14px" }}>
+                                      <span style={{ fontSize: 11, fontWeight: 800, color: "#bbb", background: "#f5f5f5", padding: "3px 8px", borderRadius: 6, fontFamily: "monospace" }}>
+                                        {l.numero ? `DON-${String(l.numero).padStart(3, "0")}` : "—"}
+                                      </span>
+                                    </td>
                                   {/* ── TIPO ── */}
                                   <td style={{ padding: "10px 14px" }}>
                                     <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: l.tipo === "Administrador" ? "#fffbeb" : "#f5edfd", color: l.tipo === "Administrador" ? "#f59e0b" : PRIMARY }}>
