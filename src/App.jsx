@@ -1164,9 +1164,34 @@ function toggleSelectAll() {
                   </div>
                 )}
 
-              <p style={{ fontSize: 11, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>
-                {filtered.length} de {leads.length} leads · clic en una fila para ver detalle
-              </p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                <p style={{ fontSize: 11, color: "#bbb", fontWeight: 600, margin: 0 }}>
+                  {filtered.length} leads · mostrando {Math.min((paginaActual - 1) * LEADS_POR_PAGINA + 1, filtered.length)}–{Math.min(paginaActual * LEADS_POR_PAGINA, filtered.length)} · página {paginaActual} de {totalPaginas}
+                </p>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button onClick={() => setPaginaActual(p => Math.max(1, p - 1))} disabled={paginaActual === 1}
+                    style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid #ede8f7", background: paginaActual === 1 ? "#f9f9f9" : "#fff", color: paginaActual === 1 ? "#ccc" : PRIMARY, fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: paginaActual === 1 ? "not-allowed" : "pointer" }}>
+                    ← Anterior
+                  </button>
+                  {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                    const page = paginaActual <= 3 ? i + 1 : paginaActual - 2 + i;
+                    if (page > totalPaginas) return null;
+                    return (
+                      <button key={page} onClick={() => setPaginaActual(page)}
+                        style={{ padding: "5px 10px", borderRadius: 8, border: `1.5px solid ${paginaActual === page ? PRIMARY : "#ede8f7"}`, background: paginaActual === page ? "#f5edfd" : "#fff", color: paginaActual === page ? PRIMARY : "#888", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        {page}
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas}
+                    style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid #ede8f7", background: paginaActual === totalPaginas ? "#f9f9f9" : "#fff", color: paginaActual === totalPaginas ? "#ccc" : PRIMARY, fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: paginaActual === totalPaginas ? "not-allowed" : "pointer" }}>
+                    Siguiente →
+                  </button>
+                </div>
+              </div>
+              
+
+
                 <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f0ebf7", overflow: "hidden" }}>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
