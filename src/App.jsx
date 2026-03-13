@@ -36,7 +36,7 @@ const TIPOS = ["Unidad Residencial", "Administrador"];
 const FUENTES = [
   "Referido", "Instagram", "WhatsApp", "LinkedIn",
   "Puerta a Puerta", "Llamada en Frío", "Salida de Campo",
-  "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado", "Otro"
+  "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado","La Lonja", "Otro"
 ];
 const TIPO_ACTIVIDAD = [
   { value: "llamada", label: "Llamada", icon: PhoneCall, color: "#0ea5e9" },
@@ -66,6 +66,7 @@ function normalizarFuente(valor) {
   if (v.includes("whatsapp") || v === "wa" || v === "wsp")  return "WhatsApp";
   if (v.includes("linkedin"))                               return "LinkedIn";
   if (v.includes("google") || v.includes("gemini")) return "Google/Gemini";
+  if (v.includes("lonja")) return "La Lonja";
   if (v.includes("girardota")) return "PQRS/Girardota";
   if (v.includes("envigado"))  return "PQRS/Envigado";
   if (v.includes("puerta"))                                 return "Puerta a Puerta";
@@ -701,7 +702,10 @@ export default function App() {
   const [fechaHasta, setFechaHasta] = useState("");
   const [seleccionados, setSeleccionados] = useState([]);
   const [bulkEstado, setBulkEstado] = useState("");
+  const [bulkFuente, setBulkFuente] = useState("");
   const [ultimaImportacion, setUltimaImportacion] = useState([]);
+  const [paginaActual, setPaginaActual] = useState(1);
+  const LEADS_POR_PAGINA = 60;
   const [modal, setModal] = useState(null);
   const [panel, setPanel] = useState(null);
   const [waModal, setWaModal] = useState(null);
@@ -781,6 +785,26 @@ async function eliminarSeleccionados() {
   await supabase.from("leads").delete().in("id", seleccionados);
   setLeads(p => p.filter(l => !seleccionados.includes(l.id)));
   setSeleccionados([]);
+}
+async function deshacerImportacion() {
+  if (ultimaImportacion.length === 0) {
+    alert("No hay importación reciente para deshacer.");
+    return;
+  }
+  const confirmar = window.confirm(`¿Eliminar los últimos ${ultimaImportacion.length} contactos importados?`);
+  if (!confirmar) return;
+  await supabase.from("leads").delete().in("id", ultimaImportacion);
+  setLeads(p => p.filter(l => !ultimaImportacion.includes(l.id)));
+  setUltimaImportacion([]);
+  alert("✅ Importación deshecha correctamente.");
+}
+
+async function cambiarFuenteMasivo() {
+  if (seleccionados.length === 0 || !bulkFuente) return;
+  await supabase.from("leads").update({ fuente: bulkFuente }).in("id", seleccionados);
+  setLeads(p => p.map(l => seleccionados.includes(l.id) ? { ...l, fuente: bulkFuente } : l));
+  setSeleccionados([]);
+  setBulkFuente("");
 }
 
 // Cambiar estado en masa
@@ -870,7 +894,8 @@ function toggleSelectAll() {
       if (inserted) {
         setLeads(p => [...inserted, ...p]);
         setUltimaImportacion(inserted.map(l => l.id));
-        alert(`✅ ${inserted.length} contactos importados. Puedes deshacer esta importación con el botón "Deshacer importación".`);
+        setPaginaActual(1);
+        alert(`✅ ${inserted.length} contactos importados. Usa "↩ Deshacer" si ves errores.`);
       }
     };
     reader.readAsBinaryString(file);
@@ -893,6 +918,11 @@ function toggleSelectAll() {
   && (!fechaDesde || new Date(l.created_at) >= new Date(fechaDesde))
   && (!fechaHasta || new Date(l.created_at) <= new Date(fechaHasta + "T23:59:59"));
 }), [leads, search, filterTipo, filterEstado, filterFuente, fechaDesde, fechaHasta]);
+    const totalPaginas = Math.ceil(filtered.length / LEADS_POR_PAGINA);
+    const leadsPagina = filtered.slice(
+      (paginaActual - 1) * LEADS_POR_PAGINA,
+      paginaActual * LEADS_POR_PAGINA
+    );
 
   const kpis = useMemo(() => ({
     total: leads.length,
@@ -1078,6 +1108,12 @@ function toggleSelectAll() {
                     <option>Todos</option>
                     {FUENTES.map(f => <option key={f}>{f}</option>)}
                   </select>
+                  {ultimaImportacion.length > 0 && (
+                    <button onClick={deshacerImportacion}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 10, border: "1.5px solid #fecaca", background: "#fff5f5", color: "#ef4444", cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                      ↩ Deshacer ({ultimaImportacion.length})
+                    </button>
+                  )}
                   <button onClick={() => fileRef.current.click()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 13px", borderRadius: 10, border: `1.5px solid ${SECONDARY}`, background: "#fffdf0", color: "#b88000", cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700 }}>
                     <Upload size={13} /> Importar
                   </button>
@@ -1087,23 +1123,39 @@ function toggleSelectAll() {
                   </button>
                 </div>
                 {/* Barra de acciones masivas */}
-                {seleccionados.length > 0 && (
+               {seleccionados.length > 0 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderRadius: 12, background: "#f5edfd", border: `1.5px solid ${PRIMARY}30`, marginBottom: 12, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: PRIMARY }}>{seleccionados.length} seleccionados</span>
-                    <div style={{ display: "flex", gap: 8, flex: 1, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 8, flex: 1, flexWrap: "wrap", alignItems: "center" }}>
+
+                      {/* Cambiar estado */}
                       <select value={bulkEstado} onChange={e => setBulkEstado(e.target.value)}
                         style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer" }}>
-                        <option value="">Cambiar estado a...</option>
+                        <option value="">Cambiar estado...</option>
                         {ESTADOS.map(e => <option key={e.label} value={e.label}>{e.label}</option>)}
                       </select>
                       <button onClick={cambiarEstadoMasivo} disabled={!bulkEstado}
                         style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: bulkEstado ? PRIMARY : "#e5e7eb", color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: bulkEstado ? "pointer" : "not-allowed" }}>
                         Aplicar
                       </button>
+
+                      {/* Cambiar fuente */}
+                      <select value={bulkFuente} onChange={e => setBulkFuente(e.target.value)}
+                        style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer" }}>
+                        <option value="">Cambiar fuente...</option>
+                        {FUENTES.map(f => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                      <button onClick={cambiarFuenteMasivo} disabled={!bulkFuente}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: bulkFuente ? "#0ea5e9" : "#e5e7eb", color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: bulkFuente ? "pointer" : "not-allowed" }}>
+                        Aplicar
+                      </button>
+
+                      {/* Eliminar */}
                       <button onClick={eliminarSeleccionados}
                         style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #fecaca", background: "#fef2f2", color: "#ef4444", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                        🗑 Eliminar seleccionados
+                        🗑 Eliminar
                       </button>
+
                       <button onClick={() => setSeleccionados([])}
                         style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #ede8f7", background: "#fff", color: "#888", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
                         Cancelar
@@ -1132,7 +1184,7 @@ function toggleSelectAll() {
                         </tr>
                       </thead>
                       <tbody>
-                          {filtered.map((l, i) => {
+                          {leadsPagina.map((l, i) => {
                             const dias = diasDesde(l.ultimo_contacto || l.created_at);
                             const frio = dias > DIAS_FRIO && l.estado !== "Cerrado / Ganado";
                             return (
