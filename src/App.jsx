@@ -710,6 +710,7 @@ export default function App() {
   const [panel, setPanel] = useState(null);
   const [waModal, setWaModal] = useState(null);
   const fileRef = useRef();
+  const fileRestoreRef = useRef();
 
   useEffect(() => { fetchLeads(); }, []);
 
@@ -759,6 +760,49 @@ export default function App() {
   setSaving(false);
   setModal(null);
 }
+const handleRestore = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    const wb = XLSX.read(ev.target.result, { type: "binary" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+    const updates = data.map(row => {
+      const r = {};
+      Object.keys(row).forEach(k => { r[k.trim().toLowerCase()] = String(row[k] || "").trim(); });
+      const idRaw = r["id"] || r["#"] || "";
+      const numero = parseInt(idRaw.replace(/[^0-9]/g, ""));
+      const fuente = normalizarFuente(r["fuente"]) || r["fuente"] || "";
+      return { numero, fuente };
+    }).filter(u => u.numero && u.fuente);
+
+    if (updates.length === 0) {
+      alert("No se encontraron registros. Verifica que el archivo tenga columnas ID y Fuente.");
+      return;
+    }
+
+    const confirmar = window.confirm(`¿Restaurar la fuente de ${updates.length} registros desde el backup?`);
+    if (!confirmar) return;
+
+    let exitosos = 0;
+    let errores = 0;
+    for (const u of updates) {
+      const { error } = await supabase
+        .from("leads")
+        .update({ fuente: u.fuente })
+        .eq("numero", u.numero);
+      if (error) errores++;
+      else exitosos++;
+    }
+
+    await fetchLeads();
+    alert(`✅ Restauración completada.\n${exitosos} actualizados.\n${errores} errores.`);
+  };
+  reader.readAsBinaryString(file);
+  e.target.value = "";
+};
   async function deleteLead(id) {
     await supabase.from("leads").delete().eq("id", id);
     setLeads(p => p.filter(l => l.id !== id));
