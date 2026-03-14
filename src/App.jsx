@@ -112,7 +112,76 @@ function StatusBadge({ estado }) {
     </span>
   );
 }
+const PASSWORD = "domonow2026";
 
+function LoginScreen({ onLogin }) {
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  function handleLogin() {
+    if (pass === PASSWORD) {
+      localStorage.setItem("crm_auth", "true");
+      onLogin();
+    } else {
+      setError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+    }
+  }
+
+  return (
+    <div style={{ height: "100vh", background: `linear-gradient(135deg, #1a0033, #820ad1, #a020f0)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Montserrat, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+      `}</style>
+
+      <div style={{ background: "#fff", borderRadius: 24, padding: "48px 40px", width: "100%", maxWidth: 400, margin: "0 16px", boxShadow: "0 32px 80px rgba(0,0,0,0.3)", animation: "fadeIn 0.5s ease", ...(shake ? { animation: "shake 0.4s ease" } : {}) }}>
+        
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ width: 64, height: 64, borderRadius: 18, background: `linear-gradient(135deg, #820ad1, #a020f0)`, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 8px 24px rgba(130,10,209,0.3)" }}>
+            <span style={{ color: "#F7B500", fontWeight: 800, fontSize: 28 }}>D</span>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: "#820ad1" }}>Domonow</div>
+          <div style={{ fontSize: 12, color: "#aaa", fontWeight: 600, marginTop: 4 }}>CRM Platform · Valle de Aburrá</div>
+        </div>
+
+        {/* Campo contraseña */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>
+            Contraseña de acceso
+          </label>
+          <input
+            type="password"
+            value={pass}
+            onChange={e => { setPass(e.target.value); setError(false); }}
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            placeholder="Ingresa la contraseña"
+            style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: `2px solid ${error ? "#fecaca" : "#ede8f7"}`, fontFamily: "Montserrat, sans-serif", fontSize: 14, outline: "none", boxSizing: "border-box", color: "#333", background: error ? "#fff5f5" : "#fff", transition: "border 0.2s" }}
+          />
+          {error && (
+            <p style={{ fontSize: 11, color: "#ef4444", fontWeight: 700, marginTop: 6 }}>
+              ❌ Contraseña incorrecta, intenta de nuevo
+            </p>
+          )}
+        </div>
+
+        {/* Botón */}
+        <button onClick={handleLogin}
+          style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #820ad1, #a020f0)", color: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 24px rgba(130,10,209,0.3)" }}>
+          Ingresar al CRM →
+        </button>
+
+        <p style={{ textAlign: "center", fontSize: 11, color: "#ddd", marginTop: 20 }}>
+          Domonow © {new Date().getFullYear()} · Acceso restringido
+        </p>
+      </div>
+    </div>
+  );
+}
 function StatusDropdown({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const s = ESTADOS.find(e => e.label === value) || ESTADOS[0];
@@ -690,6 +759,9 @@ function ReportesView({ leads }) {
 
 // ─── App Principal ────────────────────────────────────────────────────────────
 export default function App() {
+  const [autenticado, setAutenticado] = useState(
+    localStorage.getItem("crm_auth") === "true"
+  );
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -985,6 +1057,9 @@ function toggleSelectAll() {
     { id: "reportes", icon: BarChart2, label: "Reportes" },
   ];
 
+    if (!autenticado) {
+    return <LoginScreen onLogin={() => setAutenticado(true)} />;
+  }
   return (
     <div style={{ display: "flex", height: "100vh", background: "#F2F2F2", fontFamily: "'Montserrat', sans-serif", overflow: "hidden" }}>
       <style>{`
@@ -1019,6 +1094,10 @@ function toggleSelectAll() {
             <div style={{ fontSize: 12, fontWeight: 700, color: "#333" }}>Domonow</div>
             <div style={{ fontSize: 10, color: "#bbb" }}>Admin</div>
           </div>
+          <button onClick={() => { localStorage.removeItem("crm_auth"); window.location.reload(); }}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#ccc", fontFamily: "Montserrat, sans-serif", fontWeight: 700, padding: 0, marginTop: 2 }}>
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
