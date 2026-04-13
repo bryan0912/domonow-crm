@@ -36,7 +36,7 @@ const TIPOS = ["Unidad Residencial", "Administrador"];
 const FUENTES = [
   "Referido", "Instagram", "WhatsApp", "LinkedIn",
   "Puerta a Puerta", "Llamada en Frío", "Salida de Campo",
-  "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado","La Lonja", "Otro"
+  "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado","La Lonja","Plan Portero", "Otro"
 ];
 const TIPO_ACTIVIDAD = [
   { value: "llamada", label: "Llamada", icon: PhoneCall, color: "#0ea5e9" },
@@ -72,6 +72,7 @@ function normalizarFuente(valor) {
   if (v.includes("puerta"))                                 return "Puerta a Puerta";
   if (v.includes("llamada") || v.includes("fria") || v.includes("fría")) return "Llamada en Frío";
   if (v.includes("campo") || v.includes("salida"))          return "Salida de Campo";
+  if (v.includes("portero") || v.includes("plan portero")) return "Plan Portero";
   return "Otro";
 }
 
