@@ -35,7 +35,7 @@ const ESTADOS = [
 const TIPOS = ["Unidad Residencial", "Administrador"];
 const FUENTES = [
   "Referido", "Instagram", "WhatsApp", "LinkedIn",
-  "Puerta a Puerta", "Llamada en Frío", "Salida de Campo",
+  "Puerta a Puerta", "Llamada en Frío", "Salida de Campo","Landing/Página Web",
   "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado","La Lonja","Plan Portero", "Otro"
 ];
 const TIPO_ACTIVIDAD = [
@@ -73,6 +73,7 @@ function normalizarFuente(valor) {
   if (v.includes("llamada") || v.includes("fria") || v.includes("fría")) return "Llamada en Frío";
   if (v.includes("campo") || v.includes("salida"))          return "Salida de Campo";
   if (v.includes("portero") || v.includes("plan portero")) return "Plan Portero";
+  if (v.includes("Landing") || v.includes("Pagina Web")) return "Pagina web";
   return "Otro";
 }
 
