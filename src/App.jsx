@@ -644,115 +644,268 @@ function TareasView() {
 
 // ─── Vista Reportes ───────────────────────────────────────────────────────────
 function ReportesView({ leads }) {
-  const COLORS = ["#820ad1", "#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ec4899"];
+  const COLORS = ["#820ad1","#0ea5e9","#f59e0b","#10b981","#6366f1","#ec4899","#25D366","#f97316","#94a3b8","#ef4444","#06b6d4","#a855f7"];
 
-  const porEstado = ESTADOS.map(e => ({
-    name: e.label.replace("Cotización Enviada", "Cotización").replace("Contacto Inicial", "Contacto").replace("Cerrado / Ganado", "Ganado"),
-    value: leads.filter(l => l.estado === e.label).length,
-    color: e.color,
-  }));
+  const [filtroFuente, setFiltroFuente] = useState("Todas");
+  const [filtroMes, setFiltroMes] = useState("Todos");
 
-  const porFuente = FUENTES.map((f, i) => ({
-    name: f,
-    leads: leads.filter(l => l.fuente === f).length,
-    fill: COLORS[i % COLORS.length],
-  })).filter(f => f.leads > 0).sort((a, b) => b.leads - a.leads);
-
-  const porMes = useMemo(() => {
+  // Genera lista de meses disponibles
+  const mesesDisponibles = useMemo(() => {
     const meses = {};
     leads.forEach(l => {
       if (!l.created_at) return;
-      const key = new Date(l.created_at).toLocaleDateString("es-CO", { month: "short", year: "2-digit" });
-      meses[key] = (meses[key] || 0) + 1;
+      const key = new Date(l.created_at).toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+      const val = new Date(l.created_at).toISOString().slice(0, 7);
+      meses[val] = key;
     });
-    return Object.entries(meses).slice(-6).map(([mes, total]) => ({ mes, total }));
+    return Object.entries(meses).sort((a, b) => b[0].localeCompare(a[0]));
   }, [leads]);
 
-  const total = leads.length;
-  const ganados = leads.filter(l => l.estado === "Cerrado / Ganado").length;
+  // Leads filtrados según selección
+  const leadsFiltrados = useMemo(() => {
+    return leads.filter(l => {
+      const fuenteOk = filtroFuente === "Todas" || l.fuente === filtroFuente;
+      const mesOk = filtroMes === "Todos" || (l.created_at && l.created_at.startsWith(filtroMes));
+      return fuenteOk && mesOk;
+    });
+  }, [leads, filtroFuente, filtroMes]);
+
+  const hoy = new Date();
+
+  // KPIs principales
+  const total = leadsFiltrados.length;
+  const ganados = leadsFiltrados.filter(l => l.estado === "Cerrado / Ganado").length;
+  const perdidos = leadsFiltrados.filter(l => l.estado === "Perdido / Descartado" || l.estado === "No Interesado").length;
+  const activos = leadsFiltrados.filter(l => !["Cerrado / Ganado","Perdido / Descartado","No Interesado"].includes(l.estado)).length;
   const conversion = total > 0 ? ((ganados / total) * 100).toFixed(1) : 0;
-  const fuenteTop = porFuente[0]?.name || "—";
+
+  // Comparativo este mes vs anterior
   const esteMes = leads.filter(l => {
     if (!l.created_at) return false;
     const d = new Date(l.created_at);
-    const hoy = new Date();
     return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear();
   }).length;
 
+  const mesAnterior = leads.filter(l => {
+    if (!l.created_at) return false;
+    const d = new Date(l.created_at);
+    const ant = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    return d.getMonth() === ant.getMonth() && d.getFullYear() === ant.getFullYear();
+  }).length;
+
+  const crecimiento = mesAnterior > 0 ? (((esteMes - mesAnterior) / mesAnterior) * 100).toFixed(0) : 0;
+
+  // Leads por mes (últimos 8 meses)
+  const porMes = useMemo(() => {
+    const meses = {};
+    leads.filter(l => filtroFuente === "Todas" || l.fuente === filtroFuente).forEach(l => {
+      if (!l.created_at) return;
+      const key = new Date(l.created_at).toLocaleDateString("es-CO", { month: "short", year: "2-digit" });
+      const val = new Date(l.created_at).toISOString().slice(0, 7);
+      if (!meses[val]) meses[val] = { mes: key, total: 0, ganados: 0 };
+      meses[val].total++;
+      if (l.estado === "Cerrado / Ganado") meses[val].ganados++;
+    });
+    return Object.entries(meses).sort((a, b) => a[0].localeCompare(b[0])).slice(-8).map(([, v]) => v);
+  }, [leads, filtroFuente]);
+
+  // Leads por fuente con conversión
+  const porFuente = useMemo(() => {
+    return FUENTES.map((f, i) => {
+      const total = leadsFiltrados.filter(l => l.fuente === f).length;
+      const ganados = leadsFiltrados.filter(l => l.fuente === f && l.estado === "Cerrado / Ganado").length;
+      const conversion = total > 0 ? ((ganados / total) * 100).toFixed(0) : 0;
+      return { name: f, total, ganados, conversion: Number(conversion), fill: COLORS[i % COLORS.length] };
+    }).filter(f => f.total > 0).sort((a, b) => b.total - a.total);
+  }, [leadsFiltrados]);
+
+  // Tabla resumen por fuente
+  const tablaFuente = useMemo(() => {
+    return FUENTES.map((f, i) => {
+      const total = leadsFiltrados.filter(l => l.fuente === f).length;
+      const ganados = leadsFiltrados.filter(l => l.fuente === f && l.estado === "Cerrado / Ganado").length;
+      const activos = leadsFiltrados.filter(l => l.fuente === f && !["Cerrado / Ganado","Perdido / Descartado","No Interesado"].includes(l.estado)).length;
+      const perdidos = leadsFiltrados.filter(l => l.fuente === f && ["Perdido / Descartado","No Interesado"].includes(l.estado)).length;
+      const conversion = total > 0 ? ((ganados / total) * 100).toFixed(1) : "0.0";
+      return { fuente: f, total, ganados, activos, perdidos, conversion, color: COLORS[i % COLORS.length] };
+    }).filter(f => f.total > 0).sort((a, b) => b.total - a.total);
+  }, [leadsFiltrados]);
+
+  const selectStyle = { padding: "8px 12px", borderRadius: 10, border: "1.5px solid #ede8f7", background: "#fff", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, outline: "none", cursor: "pointer", color: "#555" };
+
   return (
     <div>
-      {/* KPIs de métricas */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 22 }}>
+      {/* Filtros */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 22, flexWrap: "wrap", alignItems: "center", background: "#fff", padding: "14px 18px", borderRadius: 14, border: "1px solid #f0ebf7" }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em" }}>Filtrar por:</span>
+        <select value={filtroFuente} onChange={e => setFiltroFuente(e.target.value)} style={selectStyle}>
+          <option value="Todas">Todas las fuentes</option>
+          {FUENTES.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} style={selectStyle}>
+          <option value="Todos">Todos los meses</option>
+          {mesesDisponibles.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+        </select>
+        {(filtroFuente !== "Todas" || filtroMes !== "Todos") && (
+          <button onClick={() => { setFiltroFuente("Todas"); setFiltroMes("Todos"); }}
+            style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #fecaca", background: "#fff5f5", color: "#ef4444", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            ✕ Limpiar filtros
+          </button>
+        )}
+        <span style={{ fontSize: 11, color: "#bbb", marginLeft: "auto" }}>
+          Mostrando <strong style={{ color: PRIMARY }}>{total}</strong> de {leads.length} leads
+        </span>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Tasa de Conversión", val: `${conversion}%`, icon: Target, color: "#10b981", bg: "#ecfdf5", sub: "leads cerrados" },
-          { label: "Leads este Mes", val: esteMes, icon: TrendingUp, color: PRIMARY, bg: "#f5edfd", sub: "nuevos ingresos" },
-          { label: "Fuente #1", val: fuenteTop, icon: Star, color: "#f59e0b", bg: "#fffbeb", sub: "más efectiva" },
-          { label: "Total Activos", val: leads.filter(l => l.estado !== "Cerrado / Ganado").length, icon: Activity, color: "#6366f1", bg: "#eef2ff", sub: "en proceso" },
-        ].map(({ label, val, icon: Icon, color, bg, sub }) => (
-          <div key={label} style={{ background: "#fff", borderRadius: 16, padding: 18, border: "1px solid #f0ebf7" }}>
-            <div style={{ background: bg, borderRadius: 10, padding: 9, display: "inline-flex", marginBottom: 12 }}><Icon size={17} color={color} /></div>
-            <div style={{ fontSize: typeof val === "string" && val.length > 5 ? 16 : 26, fontWeight: 800, color: "#1A1A1A", lineHeight: 1, marginBottom: 3 }}>{val}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#333", marginBottom: 2 }}>{label}</div>
-            <div style={{ fontSize: 10, color: "#bbb" }}>{sub}</div>
+          { label: "Total Leads",       val: total,       icon: Users,        color: PRIMARY,    bg: "#f5edfd" },
+          { label: "Activos",           val: activos,     icon: Activity,     color: "#6366f1",  bg: "#eef2ff" },
+          { label: "Ganados",           val: ganados,     icon: CheckCircle2, color: "#10b981",  bg: "#ecfdf5" },
+          { label: "Perdidos",          val: perdidos,    icon: TrendingDown, color: "#ef4444",  bg: "#fef2f2" },
+          { label: "Tasa Conversión",   val: `${conversion}%`, icon: Target,  color: "#f59e0b",  bg: "#fffbeb" },
+        ].map(({ label, val, icon: Icon, color, bg }) => (
+          <div key={label} style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", border: "1px solid #f0ebf7" }}>
+            <div style={{ background: bg, borderRadius: 9, padding: 8, display: "inline-flex", marginBottom: 10 }}><Icon size={16} color={color} /></div>
+            <div style={{ fontSize: typeof val === "string" ? 22 : 28, fontWeight: 800, color: "#1A1A1A", lineHeight: 1, marginBottom: 3 }}>{val}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa" }}>{label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      {/* Comparativo mes */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
         {/* Leads por mes */}
         <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
-          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 18 }}>Leads por Mes</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+            <div>
+              <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", margin: 0 }}>Leads por Mes</h3>
+              <p style={{ fontSize: 10, color: "#bbb", margin: "4px 0 0" }}>Últimos 8 meses · barras moradas = total · verdes = ganados</p>
+            </div>
+          </div>
           {porMes.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={porMes} barSize={32}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={porMes} barSize={24} barGap={4}>
                 <XAxis dataKey="mes" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ fontFamily: "Montserrat", fontSize: 12, borderRadius: 10, border: "1px solid #f0ebf7" }} />
-                <Bar dataKey="total" fill={PRIMARY} radius={[6, 6, 0, 0]} name="Leads" />
+                <Bar dataKey="total" fill={PRIMARY} radius={[6,6,0,0]} name="Total leads" />
+                <Bar dataKey="ganados" fill="#10b981" radius={[6,6,0,0]} name="Ganados" />
               </BarChart>
             </ResponsiveContainer>
-          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos aún</p>}
+          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos</p>}
         </div>
 
-        {/* Leads por fuente */}
+        {/* Comparativo */}
         <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
-          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 18 }}>Leads por Fuente</h3>
-          {porFuente.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={porFuente} layout="vertical" barSize={18}>
-                <XAxis type="number" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#555" }} axisLine={false} tickLine={false} width={90} />
-                <Tooltip contentStyle={{ fontFamily: "Montserrat", fontSize: 12, borderRadius: 10, border: "1px solid #f0ebf7" }} />
-                <Bar dataKey="leads" radius={[0, 6, 6, 0]} name="Leads">
-                  {porFuente.map((entry, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos aún</p>}
+          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 4 }}>Este Mes vs Anterior</h3>
+          <p style={{ fontSize: 10, color: "#bbb", marginBottom: 20 }}>Nuevos leads ingresados</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+            <div style={{ background: "#f5edfd", borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#888" }}>Este mes</span>
+              <span style={{ fontSize: 32, fontWeight: 800, color: PRIMARY }}>{esteMes}</span>
+            </div>
+            <div style={{ background: "#f8fafc", borderRadius: 12, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#888" }}>Mes anterior</span>
+              <span style={{ fontSize: 32, fontWeight: 800, color: "#94a3b8" }}>{mesAnterior}</span>
+            </div>
+          </div>
+          <div style={{ background: Number(crecimiento) >= 0 ? "#ecfdf5" : "#fef2f2", borderRadius: 10, padding: "10px 16px", display: "flex", alignItems: "center", gap: 8 }}>
+            {Number(crecimiento) >= 0
+              ? <TrendingUp size={16} color="#10b981" />
+              : <TrendingDown size={16} color="#ef4444" />}
+            <span style={{ fontSize: 13, fontWeight: 800, color: Number(crecimiento) >= 0 ? "#10b981" : "#ef4444" }}>
+              {Number(crecimiento) > 0 ? "+" : ""}{crecimiento}% vs mes anterior
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Embudo de conversión */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        {/* Leads por fuente */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
+          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 4 }}>Leads por Fuente</h3>
+          <p style={{ fontSize: 10, color: "#bbb", marginBottom: 16 }}>Total de leads según origen</p>
+          {porFuente.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={porFuente} layout="vertical" barSize={16}>
+                <XAxis type="number" tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fontFamily: "Montserrat", fill: "#555" }} axisLine={false} tickLine={false} width={110} />
+                <Tooltip contentStyle={{ fontFamily: "Montserrat", fontSize: 12, borderRadius: 10, border: "1px solid #f0ebf7" }} />
+                <Bar dataKey="total" radius={[0,6,6,0]} name="Leads">
+                  {porFuente.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos</p>}
+        </div>
+
+        {/* Conversión por fuente */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
+          <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 4 }}>Tasa de Conversión por Fuente</h3>
+          <p style={{ fontSize: 10, color: "#bbb", marginBottom: 16 }}>% de leads cerrados por origen</p>
+          {porFuente.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={porFuente} layout="vertical" barSize={16}>
+                <XAxis type="number" domain={[0,100]} tick={{ fontSize: 11, fontFamily: "Montserrat", fill: "#aaa" }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fontFamily: "Montserrat", fill: "#555" }} axisLine={false} tickLine={false} width={110} />
+                <Tooltip contentStyle={{ fontFamily: "Montserrat", fontSize: 12, borderRadius: 10, border: "1px solid #f0ebf7" }} formatter={v => [`${v}%`, "Conversión"]} />
+                <Bar dataKey="conversion" radius={[0,6,6,0]} name="Conversión %">
+                  {porFuente.map((entry, i) => <Cell key={i} fill={entry.conversion > 10 ? "#10b981" : entry.conversion > 5 ? "#f59e0b" : "#ef4444"} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p style={{ textAlign: "center", color: "#ddd", padding: 40, fontSize: 12 }}>Sin datos</p>}
+        </div>
+      </div>
+
+      {/* Tabla resumen por fuente */}
       <div style={{ background: "#fff", borderRadius: 16, padding: 22, border: "1px solid #f0ebf7" }}>
-        <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 20 }}>Embudo de Conversión</h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {ESTADOS.map(({ label, color, bg, icon: Icon }, i) => {
-            const count = leads.filter(l => l.estado === label).length;
-            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-            const width = 100 - (i * 10);
-            return (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ background: bg, padding: "5px 7px", borderRadius: 8, flexShrink: 0 }}><Icon size={13} color={color} /></div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#555", width: 160, flexShrink: 0 }}>{label}</span>
-                <div style={{ flex: 1, height: 28, background: "#f9fafb", borderRadius: 8, overflow: "hidden", position: "relative" }}>
-                  <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 8, opacity: 0.85, minWidth: count > 0 ? 40 : 0, display: "flex", alignItems: "center", paddingLeft: 10, transition: "width 0.6s ease" }}>
-                    {count > 0 && <span style={{ color: "#fff", fontSize: 11, fontWeight: 800 }}>{count}</span>}
-                  </div>
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 800, color, width: 38, textAlign: "right", flexShrink: 0 }}>{pct}%</span>
-              </div>
-            );
-          })}
+        <h3 style={{ fontWeight: 800, fontSize: 14, color: "#1A1A1A", marginBottom: 4 }}>Resumen por Fuente</h3>
+        <p style={{ fontSize: 10, color: "#bbb", marginBottom: 16 }}>Detalle completo de leads por origen</p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#faf5ff" }}>
+                {["Fuente", "Total", "Activos", "Ganados", "Perdidos", "Conversión"].map(h => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: h === "Fuente" ? "left" : "center", fontSize: 9, fontWeight: 800, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid #f0ebf7" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tablaFuente.map((f, i) => (
+                <tr key={f.fuente} style={{ borderBottom: i < tablaFuente.length - 1 ? "1px solid #faf5ff" : "none" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#faf5ff"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "10px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: f.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#333" }}>{f.fuente}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: PRIMARY }}>{f.total}</span>
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#6366f1" }}>{f.activos}</span>
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#10b981" }}>{f.ganados}</span>
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#ef4444" }}>{f.perdidos}</span>
+                  </td>
+                  <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20, background: Number(f.conversion) > 10 ? "#ecfdf5" : Number(f.conversion) > 5 ? "#fffbeb" : "#fef2f2", color: Number(f.conversion) > 10 ? "#10b981" : Number(f.conversion) > 5 ? "#f59e0b" : "#ef4444" }}>
+                      {f.conversion}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {tablaFuente.length === 0 && <p style={{ textAlign: "center", color: "#ddd", padding: 30, fontSize: 12 }}>Sin datos para mostrar</p>}
         </div>
       </div>
     </div>
