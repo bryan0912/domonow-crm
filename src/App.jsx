@@ -34,7 +34,7 @@ const ESTADOS = [
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
 const FUENTES = [
-  "Referido", "Instagram", "WhatsApp", "LinkedIn",
+  "Referido", "Pauta META", "WhatsApp", "LinkedIn",
   "Puerta a Puerta", "Llamada en Frío", "Salida de Campo","Landing/Página Web",
   "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado","La Lonja","Plan Portero", "Otro"
 ];
@@ -62,7 +62,7 @@ const WA_TEMPLATES = {
 function normalizarFuente(valor) {
   const v = (valor || "").toLowerCase().trim();
   if (v.includes("referid"))                                return "Referido";
-  if (v.includes("instagram") || v === "ig")                return "Instagram";
+  if (v.includes("Pauta META"))                             return "Pauta META";
   if (v.includes("whatsapp") || v === "wa" || v === "wsp")  return "WhatsApp";
   if (v.includes("linkedin"))                               return "LinkedIn";
   if (v.includes("google") || v.includes("gemini")) return "Google/Gemini";
