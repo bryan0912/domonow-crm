@@ -34,9 +34,9 @@ const ESTADOS = [
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
 const FUENTES = [
-  "Referido", "Pauta META", "WhatsApp", "LinkedIn",
-  "Puerta a Puerta", "Llamada en Frío", "Salida de Campo","Landing/Página Web",
-  "Google/Gemini", "PQRS/Girardota", "PQRS/Envigado","La Lonja","Plan Portero", "Otro"
+  "Referido", "Pauta META","Plan Portero", "LinkedIn",
+  "Puerta a Puerta", "Salida de Campo","Landing/Página Web",
+  "Google/Gemini", "PQRS/Girardota","La Lonja", "Otro"
 ];
 const TIPO_ACTIVIDAD = [
   { value: "llamada", label: "Llamada", icon: PhoneCall, color: "#0ea5e9" },
@@ -63,17 +63,13 @@ function normalizarFuente(valor) {
   const v = (valor || "").toLowerCase().trim();
   if (v.includes("referid"))                                return "Referido";
   if (v.includes("Pauta META"))                             return "Pauta META";
-  if (v.includes("whatsapp") || v === "wa" || v === "wsp")  return "WhatsApp";
   if (v.includes("linkedin"))                               return "LinkedIn";
-  if (v.includes("google") || v.includes("gemini")) return "Google/Gemini";
-  if (v.includes("lonja")) return "La Lonja";
-  if (v.includes("girardota")) return "PQRS/Girardota";
-  if (v.includes("envigado"))  return "PQRS/Envigado";
-  if (v.includes("puerta"))                                 return "Puerta a Puerta";
-  if (v.includes("llamada") || v.includes("fria") || v.includes("fría")) return "Llamada en Frío";
   if (v.includes("campo") || v.includes("salida"))          return "Salida de Campo";
   if (v.includes("portero") || v.includes("plan portero")) return "Plan Portero";
   if (v.includes("Landing") || v.includes("Pagina Web")) return "Pagina web";
+  if (v.includes("google") || v.includes("gemini")) return "Google/Gemini";
+  if (v.includes("lonja")) return "La Lonja";
+  if (v.includes("girardota")) return "PQRS/Girardota";
   return "Otro";
 }
 
