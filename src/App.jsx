@@ -35,7 +35,7 @@ const ESTADOS = [
 const TIPOS = ["Unidad Residencial", "Administrador"];
 const FUENTES = [
   "Referido", "Pauta META","Plan Portero", "LinkedIn",
-  "Puerta a Puerta", "Salida de Campo","Landing/Página Web",
+  "Salida de Campo","Landing/Página Web",
   "Google/Gemini", "PQRS/Girardota","La Lonja", "Otro"
 ];
 const TIPO_ACTIVIDAD = [
