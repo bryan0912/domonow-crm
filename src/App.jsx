@@ -33,6 +33,14 @@ const ESTADOS = [
 ];
 
 const TIPOS = ["Unidad Residencial", "Administrador"];
+const ETIQUETAS = [
+  { id: "precio",    label: "Precio",           color: "#ef4444", bg: "#fef2f2" },
+  { id: "consejo",   label: "Valida c/Consejo",  color: "#f59e0b", bg: "#fffbeb" },
+  { id: "interes",   label: "Alto Interés",      color: "#10b981", bg: "#ecfdf5" },
+  { id: "sincontacto", label: "Sin Contacto",    color: "#6366f1", bg: "#eef2ff" },
+  { id: "grande",    label: "Unidad Grande",     color: "#8b5cf6", bg: "#f5f3ff" },
+  { id: "urgente",   label: "Urgente",           color: "#ec4899", bg: "#fdf2f8" },
+];
 const FUENTES = [
   "Referido", "Pauta META","Plan Portero", "LinkedIn",
   "Salida de Campo","Landing/Página Web",
@@ -177,6 +185,42 @@ function LoginScreen({ onLogin }) {
           Domonow © {new Date().getFullYear()} · Acceso restringido
         </p>
       </div>
+    </div>
+  );
+}
+function EtiquetaDropdown({ lead, onChange }) {
+  const [open, setOpen] = useState(false);
+  const etiquetas = lead.etiquetas || [];
+
+  function toggle(id) {
+    const nuevas = etiquetas.includes(id)
+      ? etiquetas.filter(e => e !== id)
+      : [...etiquetas, id];
+    onChange(nuevas);
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setOpen(!open)}
+        style={{ width: 20, height: 20, borderRadius: 6, border: "1.5px dashed #ccc", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 14, lineHeight: 1 }}>
+        +
+      </button>
+      {open && (
+        <div style={{ position: "absolute", zIndex: 99, top: "calc(100% + 4px)", left: 0, background: "#fff", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", border: "1px solid #f0ebf7", minWidth: 180, overflow: "hidden", padding: 6 }}>
+          {ETIQUETAS.map(et => (
+            <button key={et.id} onClick={() => toggle(et.id)}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 10px", border: "none", background: etiquetas.includes(et.id) ? et.bg : "transparent", borderRadius: 8, cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 11, fontWeight: 700, color: et.color, marginBottom: 2 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: et.color, flexShrink: 0 }} />
+              {et.label}
+              {etiquetas.includes(et.id) && <span style={{ marginLeft: "auto", fontSize: 10 }}>✓</span>}
+            </button>
+          ))}
+          <button onClick={() => setOpen(false)}
+            style={{ width: "100%", padding: "6px", border: "none", background: "#f9f9f9", borderRadius: 8, cursor: "pointer", fontFamily: "Montserrat, sans-serif", fontSize: 10, fontWeight: 700, color: "#bbb", marginTop: 4 }}>
+            Cerrar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1092,6 +1136,10 @@ function toggleSelectAll() {
   }
 }
 
+  async function updateEtiquetas(id, etiquetas) {
+  await supabase.from("leads").update({ etiquetas }).eq("id", id);
+  setLeads(p => p.map(l => l.id === id ? { ...l, etiquetas } : l));
+  }
   async function updateEstado(id, estado) {
     await supabase.from("leads").update({ estado }).eq("id", id);
     setLeads(p => p.map(l => l.id === id ? { ...l, estado } : l));
@@ -1545,21 +1593,37 @@ function toggleSelectAll() {
                                 </td>
 
                                 {/* ── FUENTE ── */}
-                                <td style={{ padding: "10px 14px" }}>
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span>
-                                </td>
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>{l.fuente}</span>
+                                  </td>
 
-                                {/* ── ESTADO ── */}
-                                <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
-                                  <StatusDropdown value={l.estado} onChange={v => updateEstado(l.id, v)} />
-                                </td>
+                                  {/* ── ETIQUETAS ── */}
+                                  <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxWidth: 160 }}>
+                                      {(l.etiquetas || []).map(id => {
+                                        const et = ETIQUETAS.find(e => e.id === id);
+                                        if (!et) return null;
+                                        return (
+                                          <span key={id} style={{ fontSize: 9, fontWeight: 800, padding: "2px 7px", borderRadius: 20, background: et.bg, color: et.color, whiteSpace: "nowrap" }}>
+                                            {et.label}
+                                          </span>
+                                        );
+                                      })}
+                                      <EtiquetaDropdown lead={l} onChange={etiquetas => updateEtiquetas(l.id, etiquetas)} />
+                                    </div>
+                                  </td>
 
-                                {/* ── FECHA ── */}
-                                <td style={{ padding: "10px 14px" }}>
-                                  <span style={{ fontSize: 10, color: "#bbb", whiteSpace: "nowrap" }}>
-                                    {l.created_at ? new Date(l.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "2-digit" }) : "—"}
-                                  </span>
-                                </td>
+                                  {/* ── ESTADO ── */}
+                                  <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                                    <StatusDropdown value={l.estado} onChange={v => updateEstado(l.id, v)} />
+                                  </td>
+
+                                  {/* ── FECHA ── */}
+                                  <td style={{ padding: "10px 14px" }}>
+                                    <span style={{ fontSize: 10, color: "#bbb", whiteSpace: "nowrap" }}>
+                                      {l.created_at ? new Date(l.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "2-digit" }) : "—"}
+                                    </span>
+                                  </td>
 
                                 {/* ── ACTIVIDAD ── */}
                                 <td style={{ padding: "10px 14px" }}>
